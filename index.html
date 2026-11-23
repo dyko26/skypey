@@ -1,0 +1,3761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Under the Same Sky</title>
+  <meta name="description" content="Under the Same Sky — an interactive nocturnal constellation sky for Peyton." />
+  <meta name="theme-color" content="#0b1120" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-midnight: #0b1120;
+      --bg-indigo: #151f32;
+      --starlight: #f8fafc;
+      --gold: #e2c08d;
+      --silver-blue: #94a3b8;
+      --glass-bg: rgba(13, 20, 36, 0.62);
+      --glass-bg-deep: rgba(11, 17, 32, 0.78);
+      --glass-border: rgba(226, 192, 141, 0.16);
+      --glass-border-strong: rgba(226, 192, 141, 0.30);
+      --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-midnight);
+      color: var(--starlight);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    #sky-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    /* ============================================================
+       Subtle Top Header & Dual Horizon Bar
+       ============================================================ */
+    .hud-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: calc(22px + env(safe-area-inset-top, 0px)) 32px 0;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-6px);
+      animation: hudFadeIn 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+    }
+
+    @keyframes hudFadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: auto;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .site-title {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+      letter-spacing: 0.06em;
+      color: rgba(248, 250, 252, 0.86);
+      line-height: 1.15;
+    }
+
+    .chapter-badge {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.62rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.66);
+    }
+
+    .coordinates {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      color: rgba(148, 163, 184, 0.64);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .horizon-strip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 3px;
+      background: none;
+      border: none;
+      padding: 2px 0;
+      color: rgba(148, 163, 184, 0.56);
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      text-align: left;
+      flex-wrap: wrap;
+    }
+
+    .horizon-strip:hover,
+    .horizon-strip:focus-visible {
+      color: rgba(226, 192, 141, 0.85);
+      outline: none;
+    }
+
+    .horizon-strip .dot-sep {
+      color: rgba(226, 192, 141, 0.34);
+    }
+
+    .moon-icon {
+      width: 11px;
+      height: 11px;
+      display: inline-block;
+      vertical-align: -1px;
+      flex-shrink: 0;
+    }
+
+    .countdown-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      text-align: right;
+    }
+
+    .countdown-label {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.62rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.62);
+    }
+
+    .countdown-values {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.76rem;
+      letter-spacing: 0.1em;
+      color: rgba(248, 250, 252, 0.74);
+      font-variant-numeric: tabular-nums;
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .countdown-values .unit {
+      color: rgba(148, 163, 184, 0.6);
+      font-size: 0.66rem;
+      letter-spacing: 0.08em;
+      margin-left: 3px;
+    }
+
+    .countdown-values .sep {
+      color: rgba(226, 192, 141, 0.36);
+    }
+
+    .discovery-mini {
+      margin-top: 3px;
+      font-size: 0.6rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.48);
+      font-variant-numeric: tabular-nums;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .discovery-mini span strong {
+      font-weight: 400;
+      color: rgba(226, 192, 141, 0.72);
+    }
+
+    /* ============================================================
+       Subtle Intro Prompt & Ephemeral Whisper Toast
+       ============================================================ */
+    .intro-prompt {
+      position: fixed;
+      left: 50%;
+      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+      transform: translate(-50%, 8px);
+      z-index: 10;
+      pointer-events: none;
+      text-align: center;
+      width: calc(100% - 48px);
+      max-width: 460px;
+      opacity: 0;
+      transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .intro-prompt.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .intro-prompt p {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(1rem, 2.4vw, 1.16rem);
+      letter-spacing: 0.03em;
+      color: rgba(148, 163, 184, 0.72);
+    }
+
+    .intro-prompt .sub-cue {
+      margin-top: 6px;
+      font-family: var(--font-sans);
+      font-style: normal;
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.42);
+    }
+
+    /* Secret / Wish / Status Toast */
+    .sky-toast {
+      position: fixed;
+      top: calc(96px + env(safe-area-inset-top, 0px));
+      left: 50%;
+      transform: translate(-50%, -10px);
+      z-index: 26;
+      max-width: min(440px, calc(100% - 36px));
+      padding: 13px 22px;
+      border-radius: 12px;
+      background: rgba(13, 20, 36, 0.76);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(226, 192, 141, 0.24);
+      box-shadow: 0 16px 40px rgba(4, 8, 18, 0.55);
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .sky-toast.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .sky-toast-label {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.58rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.8);
+      margin-bottom: 4px;
+    }
+
+    .sky-toast-text {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(1.02rem, 2.5vw, 1.2rem);
+      color: rgba(248, 250, 252, 0.94);
+      line-height: 1.4;
+    }
+
+    /* ============================================================
+       Poetic Note Card & Fork Choice Card
+       ============================================================ */
+    .note-card-container {
+      position: fixed;
+      left: 50%;
+      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+      transform: translate(-50%, 16px);
+      z-index: 15;
+      width: calc(100% - 36px);
+      max-width: 540px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .note-card-container.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .note-card {
+      position: relative;
+      background: var(--glass-bg);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 20px 28px 18px;
+      text-align: center;
+      box-shadow:
+        0 20px 50px rgba(4, 8, 18, 0.55),
+        inset 0 1px 0 rgba(248, 250, 252, 0.05);
+      cursor: pointer;
+    }
+
+    .note-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 11px;
+    }
+
+    .note-index {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.62rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.74);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .note-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .note-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(148, 163, 184, 0.26);
+      transition: background 0.45s ease, transform 0.45s ease, box-shadow 0.45s ease;
+    }
+
+    .note-dot.lit {
+      background: rgba(226, 192, 141, 0.58);
+    }
+
+    .note-dot.active {
+      background: var(--gold);
+      transform: scale(1.35);
+      box-shadow: 0 0 8px rgba(226, 192, 141, 0.65);
+    }
+
+    .note-text {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(1.22rem, 3vw, 1.56rem);
+      line-height: 1.48;
+      letter-spacing: 0.015em;
+      color: rgba(248, 250, 252, 0.95);
+      transition: opacity 0.32s ease, transform 0.32s ease;
+    }
+
+    .note-text.fading {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+
+    .note-hint {
+      margin-top: 12px;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.6rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.46);
+    }
+
+    .fork-choices {
+      display: none;
+      margin-top: 16px;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .fork-choices.active {
+      display: flex;
+    }
+
+    .fork-btn {
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(226, 192, 141, 0.28);
+      background: rgba(226, 192, 141, 0.06);
+      color: rgba(248, 250, 252, 0.88);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    .fork-btn:hover,
+    .fork-btn:focus-visible {
+      background: rgba(226, 192, 141, 0.16);
+      border-color: rgba(226, 192, 141, 0.62);
+      color: var(--starlight);
+      outline: none;
+    }
+
+    /* ============================================================
+       Final Letter-Style Card
+       ============================================================ */
+    .final-card-container {
+      position: fixed;
+      left: 50%;
+      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+      transform: translate(-50%, 20px);
+      z-index: 20;
+      width: calc(100% - 36px);
+      max-width: 560px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .final-card-container.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .final-card {
+      position: relative;
+      background: rgba(13, 20, 36, 0.72);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border: 1px solid var(--glass-border-strong);
+      border-radius: 16px;
+      padding: 32px 32px 26px;
+      text-align: center;
+      box-shadow:
+        0 28px 70px rgba(4, 8, 18, 0.68),
+        0 0 42px rgba(226, 192, 141, 0.06),
+        inset 0 1px 0 rgba(226, 192, 141, 0.14);
+    }
+
+    .final-dedication {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.64rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.78);
+      margin-bottom: 14px;
+    }
+
+    .final-rule {
+      width: 42px;
+      height: 1px;
+      margin: 0 auto 18px;
+      background: linear-gradient(90deg, transparent, rgba(226, 192, 141, 0.55), transparent);
+    }
+
+    .final-message {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(1.7rem, 4.4vw, 2.38rem);
+      line-height: 1.32;
+      letter-spacing: 0.02em;
+      color: var(--starlight);
+      text-shadow: 0 0 28px rgba(226, 192, 141, 0.14);
+      margin-bottom: 10px;
+    }
+
+    .final-subnote {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(0.98rem, 2.2vw, 1.12rem);
+      color: rgba(148, 163, 184, 0.78);
+      margin-bottom: 22px;
+      min-height: 1.2em;
+    }
+
+    .final-subnote:empty {
+      display: none;
+      margin-bottom: 0;
+    }
+
+    .final-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .ghost-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 9px 20px;
+      background: rgba(226, 192, 141, 0.05);
+      border: 1px solid rgba(226, 192, 141, 0.26);
+      border-radius: 999px;
+      color: rgba(248, 250, 252, 0.84);
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.66rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.25s ease;
+    }
+
+    .ghost-btn.primary {
+      background: rgba(226, 192, 141, 0.14);
+      border-color: rgba(226, 192, 141, 0.48);
+      color: var(--starlight);
+    }
+
+    .ghost-btn:hover,
+    .ghost-btn:focus-visible {
+      background: rgba(226, 192, 141, 0.18);
+      border-color: rgba(226, 192, 141, 0.62);
+      color: var(--starlight);
+      outline: none;
+    }
+
+    .ghost-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* ============================================================
+       Ultra-Minimal Bottom Dock & Audio Control
+       ============================================================ */
+    .bottom-dock {
+      position: fixed;
+      left: 50%;
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%);
+      z-index: 22;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(11, 17, 32, 0.52);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      opacity: 0;
+      animation: hudFadeIn 1.6s ease 0.6s forwards;
+    }
+
+    .dock-btn {
+      background: none;
+      border: none;
+      padding: 6px 11px;
+      border-radius: 999px;
+      color: rgba(148, 163, 184, 0.7);
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color 0.28s ease, background 0.28s ease;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dock-btn:hover,
+    .dock-btn:focus-visible {
+      color: var(--starlight);
+      background: rgba(226, 192, 141, 0.08);
+      outline: none;
+    }
+
+    .dock-btn.active {
+      color: var(--gold);
+      background: rgba(226, 192, 141, 0.12);
+    }
+
+    .dock-sep {
+      width: 1px;
+      height: 10px;
+      background: rgba(148, 163, 184, 0.18);
+    }
+
+    .dock-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--gold);
+      display: inline-block;
+    }
+
+    .audio-toggle {
+      position: fixed;
+      right: 26px;
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      z-index: 25;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      background: rgba(11, 17, 32, 0.52);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: rgba(248, 250, 252, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease, opacity 0.3s ease;
+      opacity: 0.78;
+    }
+
+    .audio-toggle:hover,
+    .audio-toggle:focus-visible {
+      opacity: 1;
+      color: var(--gold);
+      border-color: rgba(226, 192, 141, 0.38);
+      background: rgba(21, 31, 50, 0.72);
+      outline: none;
+    }
+
+    .audio-toggle svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .audio-toggle .icon-muted { display: none; }
+    .audio-toggle.muted .icon-unmuted { display: none; }
+    .audio-toggle.muted .icon-muted { display: block; }
+
+    /* Mode Banner (Harp Mode / Plant Star Mode) */
+    .mode-banner {
+      position: fixed;
+      top: calc(92px + env(safe-area-inset-top, 0px));
+      left: 50%;
+      transform: translate(-50%, -8px);
+      z-index: 18;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 7px 16px;
+      border-radius: 999px;
+      background: rgba(13, 20, 36, 0.68);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(226, 192, 141, 0.24);
+      font-size: 0.64rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(248, 250, 252, 0.82);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      white-space: nowrap;
+    }
+
+    .mode-banner.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .mode-banner button {
+      background: none;
+      border: none;
+      border-left: 1px solid rgba(226, 192, 141, 0.22);
+      padding-left: 10px;
+      color: var(--gold);
+      font-family: var(--font-sans);
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       Translucent Overlay Sheets (Skies, Capsules, Plant Star)
+       ============================================================ */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(7, 11, 22, 0.62);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet-panel {
+      width: 100%;
+      max-width: 520px;
+      max-height: min(82vh, 660px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      background: var(--glass-bg-deep);
+      border: 1px solid var(--glass-border-strong);
+      border-radius: 16px;
+      padding: 26px 26px 24px;
+      box-shadow: 0 28px 80px rgba(3, 6, 14, 0.78);
+      transform: translateY(14px);
+      transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(226, 192, 141, 0.25) transparent;
+    }
+
+    .sheet-backdrop.open .sheet-panel {
+      transform: translateY(0);
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .sheet-title {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.45rem;
+      letter-spacing: 0.04em;
+      color: var(--starlight);
+    }
+
+    .sheet-close {
+      background: none;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      color: rgba(148, 163, 184, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .sheet-close:hover {
+      color: var(--gold);
+      border-color: rgba(226, 192, 141, 0.45);
+    }
+
+    .sheet-close svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.6;
+    }
+
+    .sheet-section-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.72);
+      margin: 16px 0 10px;
+    }
+
+    .sheet-section-label:first-of-type {
+      margin-top: 2px;
+    }
+
+    .sky-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .sky-option {
+      width: 100%;
+      text-align: left;
+      background: rgba(21, 31, 50, 0.42);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 11px;
+      padding: 13px 16px;
+      cursor: pointer;
+      transition: border-color 0.28s ease, background 0.28s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sky-option:hover {
+      border-color: rgba(226, 192, 141, 0.42);
+      background: rgba(21, 31, 50, 0.72);
+    }
+
+    .sky-option.current {
+      border-color: rgba(226, 192, 141, 0.56);
+      background: rgba(226, 192, 141, 0.08);
+    }
+
+    .sky-option-title {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 400;
+      color: var(--starlight);
+      margin-bottom: 2px;
+    }
+
+    .sky-option-sub {
+      font-size: 0.68rem;
+      font-weight: 300;
+      color: rgba(148, 163, 184, 0.72);
+      letter-spacing: 0.03em;
+    }
+
+    .sky-option-tag {
+      font-size: 0.58rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.74);
+      white-space: nowrap;
+    }
+
+    /* Capsules List */
+    .capsule-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .capsule-item {
+      background: rgba(21, 31, 50, 0.42);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 11px;
+      padding: 13px 16px;
+      transition: border-color 0.28s ease, background 0.28s ease;
+    }
+
+    .capsule-item.unlocked {
+      cursor: pointer;
+      border-color: rgba(226, 192, 141, 0.26);
+    }
+
+    .capsule-item.unlocked:hover {
+      border-color: rgba(226, 192, 141, 0.54);
+      background: rgba(226, 192, 141, 0.07);
+    }
+
+    .capsule-item.locked {
+      opacity: 0.62;
+    }
+
+    .capsule-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .capsule-title {
+      font-family: var(--font-serif);
+      font-size: 1.12rem;
+      color: var(--starlight);
+    }
+
+    .capsule-status {
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(226, 192, 141, 0.76);
+      white-space: nowrap;
+    }
+
+    .capsule-item.locked .capsule-status {
+      color: rgba(148, 163, 184, 0.65);
+    }
+
+    .capsule-date {
+      font-size: 0.64rem;
+      color: rgba(148, 163, 184, 0.58);
+      letter-spacing: 0.08em;
+      margin-top: 2px;
+    }
+
+    .capsule-body {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(226, 192, 141, 0.14);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.16rem;
+      line-height: 1.5;
+      color: rgba(248, 250, 252, 0.92);
+    }
+
+    .capsule-item.expanded .capsule-body {
+      display: block;
+    }
+
+    /* Plant Star Form & Share */
+    .plant-copy {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.06rem;
+      color: rgba(148, 163, 184, 0.85);
+      margin-bottom: 14px;
+      line-height: 1.45;
+    }
+
+    .plant-textarea {
+      width: 100%;
+      min-height: 92px;
+      resize: none;
+      border-radius: 11px;
+      border: 1px solid rgba(226, 192, 141, 0.24);
+      background: rgba(11, 17, 32, 0.68);
+      color: var(--starlight);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.15rem;
+      line-height: 1.45;
+      padding: 13px 15px;
+      outline: none;
+      user-select: text;
+      -webkit-user-select: text;
+      transition: border-color 0.25s ease;
+    }
+
+    .plant-textarea:focus {
+      border-color: rgba(226, 192, 141, 0.56);
+    }
+
+    .plant-textarea::placeholder {
+      color: rgba(148, 163, 184, 0.44);
+    }
+
+    .plant-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .char-count {
+      font-size: 0.62rem;
+      color: rgba(148, 163, 184, 0.55);
+      letter-spacing: 0.1em;
+    }
+
+    .planted-list {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .planted-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1rem;
+      color: rgba(248, 250, 252, 0.84);
+    }
+
+    .planted-remove {
+      background: none;
+      border: none;
+      color: rgba(148, 163, 184, 0.5);
+      font-family: var(--font-sans);
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .planted-remove:hover {
+      color: var(--gold);
+    }
+
+    .share-row {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .share-note {
+      font-size: 0.64rem;
+      color: rgba(148, 163, 184, 0.64);
+      line-height: 1.4;
+      max-width: 280px;
+    }
+
+    /* ============================================================
+       Responsive Mobile Layout
+       ============================================================ */
+    @media (max-width: 760px) {
+      .hud-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 8px;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 48px 0;
+      }
+
+      .brand {
+        align-items: center;
+      }
+
+      .brand-row {
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .site-title {
+        font-size: 1.24rem;
+      }
+
+      .coordinates {
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+      }
+
+      .horizon-strip {
+        justify-content: center;
+        font-size: 0.58rem;
+      }
+
+      .countdown-wrap {
+        align-items: center;
+        text-align: center;
+      }
+
+      .countdown-label {
+        font-size: 0.56rem;
+      }
+
+      .countdown-values {
+        font-size: 0.7rem;
+        gap: 5px;
+      }
+
+      .discovery-mini {
+        display: none;
+      }
+
+      .audio-toggle {
+        top: calc(14px + env(safe-area-inset-top, 0px));
+        right: 12px;
+        bottom: auto;
+        width: 32px;
+        height: 32px;
+      }
+
+      .bottom-dock {
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        padding: 3px 6px;
+        gap: 2px;
+      }
+
+      .dock-btn {
+        padding: 6px 9px;
+        font-size: 0.58rem;
+        letter-spacing: 0.12em;
+      }
+
+      .intro-prompt {
+        bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+      }
+
+      .note-card-container {
+        bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+        width: calc(100% - 24px);
+      }
+
+      .note-card {
+        padding: 16px 18px 15px;
+      }
+
+      .final-card-container {
+        bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+        width: calc(100% - 24px);
+      }
+
+      .final-card {
+        padding: 24px 20px 22px;
+      }
+
+      .mode-banner {
+        top: calc(134px + env(safe-area-inset-top, 0px));
+        font-size: 0.58rem;
+        padding: 6px 12px;
+      }
+
+      .sky-toast {
+        top: calc(134px + env(safe-area-inset-top, 0px));
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="sky-canvas" aria-label="Interactive night sky constellation"></canvas>
+
+  <!-- Minimal Top HUD -->
+  <header class="hud-header">
+    <div class="brand">
+      <div class="brand-row">
+        <h1 class="site-title">Under the Same Sky</h1>
+        <span class="chapter-badge" id="chapter-badge">Chapter I</span>
+      </div>
+      <p class="coordinates">51.04° N, 114.07° W &nbsp;·&nbsp; 10.37° N, 84.53° W</p>
+      <button type="button" class="horizon-strip" id="horizon-toggle" title="Switch sky horizon view">
+        <span id="horizon-clocks">--:-- · --:--</span>
+        <span class="dot-sep" aria-hidden="true">·</span>
+        <span id="moon-wrap"></span>
+        <span class="dot-sep" aria-hidden="true">·</span>
+        <span id="horizon-dist">5,297 km</span>
+      </button>
+    </div>
+
+    <div class="countdown-wrap" aria-label="Countdown until we meet again">
+      <span class="countdown-label">Until we meet again</span>
+      <div class="countdown-values" id="countdown-display">
+        <span><strong id="cd-days" style="font-weight:400;">--</strong><span class="unit" id="cd-days-unit">Days</span></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span><strong id="cd-hours" style="font-weight:400;">--</strong><span class="unit" id="cd-hours-unit">Hours</span></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span><strong id="cd-minutes" style="font-weight:400;">--</strong><span class="unit" id="cd-minutes-unit">Minutes</span></span>
+      </div>
+      <div class="discovery-mini" id="discovery-mini">
+        <span>Secrets <strong id="secrets-count">0/3</strong></span>
+        <span>Wishes <strong id="wishes-count">0</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Ephemeral Toast (Hidden stars, Caught shooting stars, Planted stars) -->
+  <div class="sky-toast" id="sky-toast" role="status" aria-live="polite">
+    <p class="sky-toast-label" id="sky-toast-label"></p>
+    <p class="sky-toast-text" id="sky-toast-text"></p>
+  </div>
+
+  <!-- Mode Banner (Free Harp or Planting Mode) -->
+  <div class="mode-banner" id="mode-banner">
+    <span id="mode-banner-text"></span>
+    <button type="button" id="mode-banner-exit">Done</button>
+  </div>
+
+  <!-- Initial Prompt -->
+  <div class="intro-prompt" id="intro-prompt">
+    <p id="intro-prompt-main">Touch or drag from the glowing star to trace the sky</p>
+    <p class="sub-cue">Explore the dark for hidden stars · Catch shooting stars</p>
+  </div>
+
+  <!-- Poetic Note Card -->
+  <section class="note-card-container" id="note-card-container" aria-live="polite" aria-atomic="true">
+    <div class="note-card" id="note-card" role="button" tabindex="0" aria-label="Advance to next star">
+      <div class="note-meta">
+        <span class="note-index" id="note-index">I &nbsp;/&nbsp; VII</span>
+        <div class="note-dots" id="note-dots" aria-hidden="true"></div>
+      </div>
+      <p class="note-text" id="note-text"></p>
+      <div class="fork-choices" id="fork-choices">
+        <button type="button" class="fork-btn" id="fork-btn-a"></button>
+        <button type="button" class="fork-btn" id="fork-btn-b"></button>
+      </div>
+      <p class="note-hint" id="note-hint">Drag to the next star, tap it, or tap anywhere</p>
+    </div>
+  </section>
+
+  <!-- Final Letter-Style Card -->
+  <section class="final-card-container" id="final-card-container" aria-live="polite" aria-atomic="true">
+    <div class="final-card">
+      <p class="final-dedication" id="final-dedication">For Peyton</p>
+      <div class="final-rule" aria-hidden="true"></div>
+      <p class="final-message" id="final-message"></p>
+      <p class="final-subnote" id="final-subnote"></p>
+      <div class="final-actions">
+        <button type="button" class="ghost-btn primary" id="next-chapter-btn" style="display:none;">Next Chapter</button>
+        <button type="button" class="ghost-btn" id="harp-mode-btn">Play Sky Harp</button>
+        <button type="button" class="ghost-btn" id="replay-btn">Replay Sky</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Minimal Bottom Navigation Dock -->
+  <nav class="bottom-dock" aria-label="Sky navigation">
+    <button type="button" class="dock-btn" id="dock-skies">Skies</button>
+    <span class="dock-sep" aria-hidden="true"></span>
+    <button type="button" class="dock-btn" id="dock-capsules">Capsules <span class="dock-dot" id="capsule-dot" aria-hidden="true"></span></button>
+    <span class="dock-sep" aria-hidden="true"></span>
+    <button type="button" class="dock-btn" id="dock-plant">Plant</button>
+    <span class="dock-sep" id="dock-harp-sep" style="display:none;" aria-hidden="true"></span>
+    <button type="button" class="dock-btn" id="dock-harp" style="display:none;">Harp</button>
+  </nav>
+
+  <!-- Minimal Audio Mute/Unmute Toggle -->
+  <button type="button" class="audio-toggle" id="audio-toggle" aria-label="Mute sound" aria-pressed="false" title="Toggle sound">
+    <svg class="icon-unmuted" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M11 5L6 9H3v6h3l5 4V5z"></path>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      <path d="M18.66 5.34a9 9 0 0 1 0 13.32"></path>
+    </svg>
+    <svg class="icon-muted" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M11 5L6 9H3v6h3l5 4V5z"></path>
+      <line x1="22" y1="9" x2="16" y2="15"></line>
+      <line x1="16" y1="9" x2="22" y2="15"></line>
+    </svg>
+  </button>
+
+  <!-- Overlay Sheet: Skies (Chapters & Open When Moods) -->
+  <div class="sheet-backdrop" id="sheet-skies" role="dialog" aria-modal="true" aria-labelledby="sheet-skies-title">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="sheet-skies-title">Constellations &amp; Skies</h2>
+        <button type="button" class="sheet-close" data-close-sheet aria-label="Close">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <p class="sheet-section-label">The Journey — Three Chapters</p>
+      <div class="sky-grid" id="chapters-list"></div>
+
+      <p class="sheet-section-label">Open This Sky When...</p>
+      <div class="sky-grid" id="moods-list"></div>
+    </div>
+  </div>
+
+  <!-- Overlay Sheet: Time Capsules -->
+  <div class="sheet-backdrop" id="sheet-capsules" role="dialog" aria-modal="true" aria-labelledby="sheet-capsules-title">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="sheet-capsules-title">Time Capsules</h2>
+        <button type="button" class="sheet-close" data-close-sheet aria-label="Close">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <p class="plant-copy">Letters sealed in starlight, unlocking automatically as we draw closer to March 20, 2027.</p>
+      <div class="capsule-list" id="capsule-list"></div>
+    </div>
+  </div>
+
+  <!-- Overlay Sheet: Plant a Star & Share Sky -->
+  <div class="sheet-backdrop" id="sheet-plant" role="dialog" aria-modal="true" aria-labelledby="sheet-plant-title">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="sheet-plant-title">Leave a Star in the Sky</h2>
+        <button type="button" class="sheet-close" data-close-sheet aria-label="Close">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <p class="plant-copy" id="plant-intro-copy">Write a quiet thought to place among the stars, or tap "Pick Spot" to place it directly on the canvas.</p>
+      <textarea class="plant-textarea" id="plant-input" maxlength="160" placeholder="Leave a note for this sky..."></textarea>
+      <div class="plant-footer">
+        <span class="char-count" id="plant-char-count">0 / 160</span>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="ghost-btn" id="pick-spot-btn">Pick Spot</button>
+          <button type="button" class="ghost-btn primary" id="confirm-plant-btn">Place Star</button>
+        </div>
+      </div>
+
+      <div class="planted-list" id="planted-list-wrap" style="display:none;">
+        <p class="sheet-section-label">Planted Stars</p>
+        <div id="planted-list"></div>
+        <div class="share-row">
+          <p class="share-note">Copy a link containing your planted stars to send your sky back.</p>
+          <button type="button" class="ghost-btn primary" id="copy-share-btn">Copy Sky Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // ============================================================
+      // Content Configuration (Exact required CONFIG values preserved)
+      // ============================================================
+      const CONFIG = {
+        targetDate: "2027-03-20T00:00:00",
+        stars: [
+          "Distance is just a quiet test of how far love can travel.",
+          "Different cities, different weather—still the exact same sky.",
+          "Missing you is just my heart keeping your place warm.",
+          "Every mile between us is only temporary.",
+          "Even from afar, you are my favorite part of every day.",
+          "We are just counting down the days until 'soon' becomes 'now'.",
+          "No distance could ever make you feel far from me."
+        ],
+        finalMessage: "I'm here and I will be."
+      };
+
+      const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+
+      // ============================================================
+      // Extended Skies: 3 Chapters (with branching choices) + 3 Moods
+      // ============================================================
+      const SKIES = {
+        chapter1: {
+          id: 'chapter1',
+          kind: 'chapter',
+          badge: 'Chapter I',
+          title: 'I. The Distance',
+          subtitle: 'Seven quiet truths under a shared midnight sky',
+          nextId: 'chapter2',
+          palette: { center: '#151f32', mid: '#0f172a', edge: '#0b1120', horizon: 'rgba(30, 44, 72, 0.24)' },
+          scale: [293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25], // D major pentatonic
+          chord: [146.83, 220.00, 293.66, 369.99, 440.00, 659.25, 739.99],
+          layoutLandscape: [
+            { x: 0.14, y: 0.62 }, { x: 0.26, y: 0.34 }, { x: 0.39, y: 0.50 },
+            { x: 0.51, y: 0.22 }, { x: 0.64, y: 0.42 }, { x: 0.76, y: 0.18 }, { x: 0.87, y: 0.46 }
+          ],
+          layoutPortrait: [
+            { x: 0.20, y: 0.86 }, { x: 0.48, y: 0.74 }, { x: 0.27, y: 0.57 },
+            { x: 0.58, y: 0.48 }, { x: 0.81, y: 0.37 }, { x: 0.47, y: 0.22 }, { x: 0.72, y: 0.08 }
+          ],
+          stars: CONFIG.stars,
+          secrets: [
+            { x: 0.20, y: 0.18, text: "Hidden star: Even on my quietest days, you are the first thought that softens the morning." },
+            { x: 0.54, y: 0.74, text: "Hidden star: Somewhere between 51° N and 10° N, our nights overlap." },
+            { x: 0.84, y: 0.72, text: "Hidden star: If you ever doubt it—look up. I am looking at the same stars." }
+          ],
+          finalDedication: 'For Peyton',
+          finalMessage: CONFIG.finalMessage,
+          finalSubnote: ''
+        },
+
+        chapter2: {
+          id: 'chapter2',
+          kind: 'chapter',
+          badge: 'Chapter II',
+          title: 'II. Across the Miles',
+          subtitle: 'Choose a constellation path: a memory or a promise',
+          nextId: 'chapter3',
+          palette: { center: '#17233a', mid: '#101a2e', edge: '#0b1120', horizon: 'rgba(42, 54, 84, 0.26)' },
+          scale: [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33], // C major pentatonic
+          chord: [130.81, 196.00, 261.63, 329.63, 392.00, 587.33, 659.25],
+          layoutLandscape: [
+            { x: 0.12, y: 0.46 }, { x: 0.25, y: 0.58 }, { x: 0.38, y: 0.42 },
+            { x: 0.52, y: 0.24 }, { x: 0.65, y: 0.18 }, { x: 0.78, y: 0.34 }, { x: 0.89, y: 0.22 }
+          ],
+          layoutPortrait: [
+            { x: 0.50, y: 0.88 }, { x: 0.26, y: 0.74 }, { x: 0.52, y: 0.60 },
+            { x: 0.26, y: 0.42 }, { x: 0.42, y: 0.28 }, { x: 0.24, y: 0.16 }, { x: 0.52, y: 0.08 }
+          ],
+          stars: [
+            "Time zones only change the numbers on a clock, never how close you feel.",
+            "Every small message from you turns an ordinary afternoon into something warm.",
+            "Two paths open in the quiet sky—choose the star you want to follow."
+          ],
+          fork: {
+            atIndex: 3,
+            optionA: {
+              id: 'memory',
+              label: 'A Quiet Memory',
+              layoutLandscape: [
+                { x: 0.52, y: 0.22 }, { x: 0.65, y: 0.16 }, { x: 0.77, y: 0.30 }, { x: 0.88, y: 0.18 }
+              ],
+              layoutPortrait: [
+                { x: 0.26, y: 0.44 }, { x: 0.42, y: 0.30 }, { x: 0.24, y: 0.17 }, { x: 0.50, y: 0.08 }
+              ],
+              stars: [
+                "I still replay the sound of your laugh when the room gets too quiet.",
+                "Some moments with you stay lit long after the day has ended.",
+                "I keep the smallest details of you carefully folded inside my memory.",
+                "Everything we have already lived is proof of what we are building."
+              ],
+              finalMessage: "Every memory of you is a lantern I carry.",
+              finalSubnote: "Path of Memory — woven into the northern arc."
+            },
+            optionB: {
+              id: 'promise',
+              label: 'A Promise Ahead',
+              layoutLandscape: [
+                { x: 0.53, y: 0.62 }, { x: 0.66, y: 0.72 }, { x: 0.78, y: 0.54 }, { x: 0.89, y: 0.64 }
+              ],
+              layoutPortrait: [
+                { x: 0.76, y: 0.44 }, { x: 0.60, y: 0.30 }, { x: 0.78, y: 0.17 }, { x: 0.52, y: 0.08 }
+              ],
+              stars: [
+                "I promise to keep choosing you patiently on every quiet day in between.",
+                "No season of waiting will ever make my heart grow tired of yours.",
+                "One day we will look back at this map and smile at how steady we stayed.",
+                "All the days we waited will feel small beside the ones still ahead."
+              ],
+              finalMessage: "My patience is quiet, and it belongs to you.",
+              finalSubnote: "Path of Promise — woven into the southern arc."
+            }
+          },
+          secrets: [
+            { x: 0.18, y: 0.20, text: "Hidden star: You never have to carry a heavy day alone, even across borders." },
+            { x: 0.48, y: 0.82, text: "Hidden star: Every flight path between us is just a line waiting to be crossed." },
+            { x: 0.86, y: 0.42, text: "Hidden star: My favorite notifications will always have your name on them." }
+          ],
+          finalDedication: 'Chapter II · For Peyton'
+        },
+
+        chapter3: {
+          id: 'chapter3',
+          kind: 'chapter',
+          badge: 'Chapter III',
+          title: 'III. Until Soon Becomes Now',
+          subtitle: 'Where midnight softens toward the day we meet again',
+          nextId: null,
+          palette: { center: '#1e273d', mid: '#141d31', edge: '#0b1120', horizon: 'rgba(130, 108, 92, 0.20)' },
+          scale: [329.63, 369.99, 415.30, 493.88, 554.37, 659.25, 739.99], // E major pentatonic
+          chord: [164.81, 246.94, 329.63, 415.30, 493.88, 659.25, 739.99],
+          layoutLandscape: [
+            { x: 0.13, y: 0.66 }, { x: 0.25, y: 0.50 }, { x: 0.38, y: 0.38 },
+            { x: 0.52, y: 0.24 }, { x: 0.65, y: 0.30 }, { x: 0.77, y: 0.22 }, { x: 0.88, y: 0.36 }
+          ],
+          layoutPortrait: [
+            { x: 0.22, y: 0.86 }, { x: 0.44, y: 0.73 }, { x: 0.54, y: 0.58 },
+            { x: 0.30, y: 0.42 }, { x: 0.48, y: 0.29 }, { x: 0.32, y: 0.16 }, { x: 0.50, y: 0.08 }
+          ],
+          stars: [
+            "Every sunrise brings March twentieth one breath closer.",
+            "Imagine the quiet relief of finally standing in the same room again.",
+            "Before the horizon brightens, choose how this sky closes tonight."
+          ],
+          fork: {
+            atIndex: 3,
+            optionA: {
+              id: 'stillness',
+              label: 'Under Quiet Stars',
+              layoutLandscape: [
+                { x: 0.52, y: 0.20 }, { x: 0.66, y: 0.28 }, { x: 0.78, y: 0.16 }, { x: 0.88, y: 0.32 }
+              ],
+              layoutPortrait: [
+                { x: 0.28, y: 0.43 }, { x: 0.50, y: 0.30 }, { x: 0.30, y: 0.16 }, { x: 0.50, y: 0.08 }
+              ],
+              stars: [
+                "We will not even need to rush the words once we are side by side.",
+                "Just your hand in mine will make every waiting night make sense.",
+                "Until then, let this sky be a calm place whenever the night feels long.",
+                "No clock, no border, and no quiet hour can undo what is ours."
+              ],
+              finalMessage: "Always under the same sky, until I hold your hand again.",
+              finalSubnote: "Ending I · Stillness — calm, steady, and yours."
+            },
+            optionB: {
+              id: 'firstlight',
+              label: 'At First Light',
+              layoutLandscape: [
+                { x: 0.53, y: 0.54 }, { x: 0.66, y: 0.42 }, { x: 0.78, y: 0.52 }, { x: 0.88, y: 0.30 }
+              ],
+              layoutPortrait: [
+                { x: 0.74, y: 0.43 }, { x: 0.52, y: 0.30 }, { x: 0.72, y: 0.16 }, { x: 0.50, y: 0.08 }
+              ],
+              stars: [
+                "The first morning we wake up in the same city will feel like gold.",
+                "No more counting hours across maps—only deciding where to walk next.",
+                "Every mile we crossed in patience turns into our beginning.",
+                "March twentieth is not the finish line; it is where the real story opens."
+              ],
+              finalMessage: "Every night of waiting is leading us straight into morning.",
+              finalSubnote: "Ending II · First Light — for the day 'soon' becomes 'now'."
+            }
+          },
+          secrets: [
+            { x: 0.16, y: 0.24, text: "Hidden star: First hug on March 20, 2027—already reserved for you." },
+            { x: 0.50, y: 0.78, text: "Hidden star: You have been worth every single day on this countdown." },
+            { x: 0.84, y: 0.68, text: "Hidden star: No matter which stars you chose, every path leads back to you." }
+          ],
+          finalDedication: 'Chapter III · For Peyton'
+        },
+
+        mood_miss: {
+          id: 'mood_miss',
+          kind: 'mood',
+          badge: 'When You Miss Me',
+          title: 'When You Miss Me',
+          subtitle: 'Seven reminders for the days the distance feels heavy',
+          nextId: null,
+          palette: { center: '#182136', mid: '#10182b', edge: '#0b1120', horizon: 'rgba(54, 62, 92, 0.25)' },
+          scale: [311.13, 349.23, 392.00, 466.16, 523.25, 622.25, 698.46], // Eb major pentatonic
+          chord: [155.56, 233.08, 311.13, 392.00, 466.16, 622.25, 698.46],
+          layoutLandscape: [
+            { x: 0.16, y: 0.50 }, { x: 0.29, y: 0.28 }, { x: 0.42, y: 0.44 },
+            { x: 0.50, y: 0.64 }, { x: 0.61, y: 0.42 }, { x: 0.73, y: 0.26 }, { x: 0.85, y: 0.48 }
+          ],
+          layoutPortrait: [
+            { x: 0.24, y: 0.82 }, { x: 0.48, y: 0.68 }, { x: 0.74, y: 0.58 },
+            { x: 0.50, y: 0.44 }, { x: 0.26, y: 0.34 }, { x: 0.52, y: 0.20 }, { x: 0.74, y: 0.10 }
+          ],
+          stars: [
+            "If you opened this tonight, pause for a second and breathe with me.",
+            "I am probably thinking about you right at this exact minute.",
+            "Missing each other is only loud because what we have is real.",
+            "Close your eyes—imagine my arm around your shoulders for a moment.",
+            "You do not have to be strong every hour; I am right here with you.",
+            "This ache has an expiration date, and it shrinks every single night.",
+            "Even miles away, my heart stays parked right beside yours."
+          ],
+          secrets: [
+            { x: 0.22, y: 0.74, text: "Hidden star: Send me a message whenever you want—day or night." },
+            { x: 0.52, y: 0.18, text: "Hidden star: You are deeply, quietly, completely loved." },
+            { x: 0.82, y: 0.72, text: "Hidden star: Count three slow breaths. I am here." }
+          ],
+          finalDedication: 'For Peyton',
+          finalMessage: "Whenever you miss me, I am already missing you back.",
+          finalSubnote: "Stay here as long as you need."
+        },
+
+        mood_sleep: {
+          id: 'mood_sleep',
+          kind: 'mood',
+          badge: 'When You Can\'t Sleep',
+          title: 'When You Can\'t Sleep',
+          subtitle: 'A slow, quiet lullaby sky for restless nights',
+          nextId: null,
+          palette: { center: '#111a2c', mid: '#0d1424', edge: '#090e1a', horizon: 'rgba(22, 34, 58, 0.24)' },
+          scale: [220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25], // Soft A minor / C pentatonic lullaby
+          chord: [130.81, 196.00, 261.63, 329.63, 392.00, 440.00, 523.25],
+          layoutLandscape: [
+            { x: 0.15, y: 0.38 }, { x: 0.27, y: 0.48 }, { x: 0.40, y: 0.54 },
+            { x: 0.53, y: 0.52 }, { x: 0.66, y: 0.44 }, { x: 0.77, y: 0.34 }, { x: 0.87, y: 0.24 }
+          ],
+          layoutPortrait: [
+            { x: 0.24, y: 0.84 }, { x: 0.38, y: 0.72 }, { x: 0.54, y: 0.60 },
+            { x: 0.66, y: 0.46 }, { x: 0.54, y: 0.32 }, { x: 0.40, y: 0.20 }, { x: 0.56, y: 0.08 }
+          ],
+          stars: [
+            "Let the noise of the day settle softly to the floor.",
+            "Nothing needs to be solved at this hour of the night.",
+            "Unclench your shoulders, soften your breath, and watch the stars drift.",
+            "The night sky is holding watch while you rest.",
+            "If your thoughts are spinning, leave them right here in the dark with me.",
+            "Tomorrow will wait politely until you have slept.",
+            "Goodnight, Peyton. Dream gently—I will meet you in the morning."
+          ],
+          secrets: [
+            { x: 0.24, y: 0.20, text: "Hidden star: Inhale slowly for four seconds... exhale for six." },
+            { x: 0.50, y: 0.78, text: "Hidden star: You are safe, you are loved, and you can rest." },
+            { x: 0.82, y: 0.66, text: "Hidden star: Goodnight from under the same quiet moon." }
+          ],
+          finalDedication: 'Goodnight, Peyton',
+          finalMessage: "Rest softly tonight. I will be here when you wake.",
+          finalSubnote: "You can tap the stars gently like a lullaby harp."
+        },
+
+        mood_smile: {
+          id: 'mood_smile',
+          kind: 'mood',
+          badge: 'When You Need a Smile',
+          title: 'When You Need a Smile',
+          subtitle: 'Seven warm sparks to brighten a quiet afternoon',
+          nextId: null,
+          palette: { center: '#1a253d', mid: '#121b2f', edge: '#0b1120', horizon: 'rgba(116, 98, 76, 0.16)' },
+          scale: [392.00, 440.00, 493.88, 587.33, 659.25, 783.99, 880.00], // Bright G major pentatonic
+          chord: [196.00, 293.66, 392.00, 493.88, 587.33, 783.99, 880.00],
+          layoutLandscape: [
+            { x: 0.14, y: 0.48 }, { x: 0.27, y: 0.60 }, { x: 0.40, y: 0.34 },
+            { x: 0.52, y: 0.52 }, { x: 0.65, y: 0.26 }, { x: 0.77, y: 0.44 }, { x: 0.88, y: 0.24 }
+          ],
+          layoutPortrait: [
+            { x: 0.22, y: 0.84 }, { x: 0.66, y: 0.74 }, { x: 0.32, y: 0.60 },
+            { x: 0.72, y: 0.46 }, { x: 0.28, y: 0.32 }, { x: 0.64, y: 0.20 }, { x: 0.44, y: 0.08 }
+          ],
+          stars: [
+            "Official reminder: you are effortlessly my favorite person on this planet.",
+            "Somewhere right now, I am smiling at my phone just thinking about you.",
+            "You have a way of making even the smallest moments feel cinematic.",
+            "If stars got jealous, they would definitely be competing with your eyes.",
+            "Whatever tried to test your patience today has no chance against you.",
+            "We still owe each other far too many late-night laughs and slow mornings.",
+            "Thank you for existing—and for letting me be yours."
+          ],
+          secrets: [
+            { x: 0.18, y: 0.22, text: "Hidden star: You just caught a secret compliment—you are radiant." },
+            { x: 0.52, y: 0.78, text: "Hidden star: Redeemable for one unnecessarily long hug on March 20." },
+            { x: 0.84, y: 0.68, text: "Hidden star: Still smiling? Good. Keep that one." }
+          ],
+          finalDedication: 'For Peyton',
+          finalMessage: "You are the warmest part of every sky I look at.",
+          finalSubnote: "Try catching a shooting star before you go."
+        }
+      };
+
+      // ============================================================
+      // Shooting Star Wish Notes
+      // ============================================================
+      const WISH_NOTES = [
+        "Wish caught — may every day between now and March twentieth pass gently.",
+        "Wish caught — a quiet promise saved among the drifting stars.",
+        "Wish caught — may tonight bring you calm sleep and warm thoughts.",
+        "Wish caught — one step closer to the moment distance disappears.",
+        "Wish caught — some wishes do not need luck, only patience."
+      ];
+
+      // ============================================================
+      // Time Capsules (Auto-unlock by device date, zero server needed)
+      // ============================================================
+      const CAPSULES = [
+        {
+          id: 'now',
+          title: 'The First Capsule',
+          date: '2026-11-23T00:00:00',
+          displayDate: 'November 23, 2026',
+          message: "I built this quiet corner of the sky so you would always have somewhere to go when the miles feel loud. Come back whenever you want—more stars will unlock along the way."
+        },
+        {
+          id: 'solstice',
+          title: 'Longest Night of the Year',
+          date: '2026-12-21T00:00:00',
+          displayDate: 'December 21, 2026',
+          message: "Even on the longest night of winter, the light starts returning right after tonight. Every day from here grows a little brighter toward us."
+        },
+        {
+          id: 'christmas',
+          title: 'A Quiet Christmas Sky',
+          date: '2026-12-25T00:00:00',
+          displayDate: 'December 25, 2026',
+          message: "Merry Christmas, Peyton. No matter how many kilometers sit between our cities tonight, you are the warmest gift in my year."
+        },
+        {
+          id: 'newyear',
+          title: 'The Year We Meet Again',
+          date: '2027-01-01T00:00:00',
+          displayDate: 'January 1, 2027',
+          message: "Happy 2027. We can finally say we are seeing each other this year—and not much longer from now."
+        },
+        {
+          id: 'valentines',
+          title: 'Across the Map',
+          date: '2027-02-14T00:00:00',
+          displayDate: 'February 14, 2027',
+          message: "Happy Valentine's Day, Peyton. A little over a month left until I do not have to send my heart through a screen anymore."
+        },
+        {
+          id: 'thirtydays',
+          title: 'Thirty Days Left',
+          date: '2027-02-18T00:00:00',
+          displayDate: 'February 18, 2027',
+          message: "Just thirty days remaining. Every week of patience has carried us right to the edge of 'soon'."
+        },
+        {
+          id: 'eve',
+          title: 'The Night Before',
+          date: '2027-03-19T00:00:00',
+          displayDate: 'March 19, 2027',
+          message: "Tomorrow the countdown reaches zero. Look up one last time from afar—tomorrow we stand under the same sky together."
+        },
+        {
+          id: 'reunion',
+          title: 'Finally Now',
+          date: '2027-03-20T00:00:00',
+          displayDate: 'March 20, 2027',
+          message: "March twentieth is here. No more miles, no more waiting. I told you: I'm here and I will be."
+        }
+      ];
+
+      // ============================================================
+      // Web Audio API Synthesizer (Harp, Glissando, Drag Hum & Reverb)
+      // ============================================================
+      class SkyAudio {
+        constructor() {
+          this.ctx = null;
+          this.masterGain = null;
+          this.reverbNode = null;
+          this.reverbGain = null;
+          this.muted = false;
+          this.dragOsc = null;
+          this.dragGain = null;
+          this.dragFilter = null;
+        }
+
+        ensureContext() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return false;
+            this.ctx = new AudioCtx();
+
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = this.muted ? 0 : 0.78;
+            this.masterGain.connect(this.ctx.destination);
+
+            this.reverbNode = this.ctx.createConvolver();
+            this.reverbNode.buffer = this.createImpulseResponse(3.1, 2.8);
+
+            this.reverbGain = this.ctx.createGain();
+            this.reverbGain.gain.value = 0.44;
+
+            this.reverbNode.connect(this.reverbGain);
+            this.reverbGain.connect(this.masterGain);
+          }
+
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+          return true;
+        }
+
+        createImpulseResponse(duration, decay) {
+          const rate = this.ctx.sampleRate;
+          const length = Math.floor(rate * duration);
+          const impulse = this.ctx.createBuffer(2, length, rate);
+          for (let ch = 0; ch < 2; ch++) {
+            const data = impulse.getChannelData(ch);
+            let lp = 0;
+            for (let i = 0; i < length; i++) {
+              const t = i / length;
+              const env = Math.pow(1 - t, decay);
+              const white = Math.random() * 2 - 1;
+              lp = lp * 0.72 + white * 0.28;
+              data[i] = lp * env;
+            }
+          }
+          return impulse;
+        }
+
+        setMuted(isMuted) {
+          this.muted = isMuted;
+          if (this.ctx && this.masterGain) {
+            const now = this.ctx.currentTime;
+            this.masterGain.gain.cancelScheduledValues(now);
+            this.masterGain.gain.setTargetAtTime(isMuted ? 0 : 0.78, now, 0.04);
+          }
+          if (isMuted) this.stopDragTone();
+        }
+
+        playPluck(freq, startTime, velocity = 0.23, decayTime = 3.0) {
+          if (!this.ctx || !this.masterGain) return;
+
+          const noteGain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(Math.min(freq * 6.5, 3600), startTime);
+          filter.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.5, 500), startTime + decayTime * 0.75);
+          filter.Q.value = 0.7;
+
+          const osc1 = this.ctx.createOscillator();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(freq, startTime);
+
+          const osc2 = this.ctx.createOscillator();
+          const osc2Gain = this.ctx.createGain();
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(freq * 2, startTime);
+          osc2Gain.gain.setValueAtTime(0.15, startTime);
+          osc2Gain.gain.exponentialRampToValueAtTime(0.001, startTime + decayTime * 0.42);
+
+          const osc3 = this.ctx.createOscillator();
+          const osc3Gain = this.ctx.createGain();
+          osc3.type = 'sine';
+          osc3.frequency.setValueAtTime(freq * 3, startTime);
+          osc3Gain.gain.setValueAtTime(0.04, startTime);
+          osc3Gain.gain.exponentialRampToValueAtTime(0.0008, startTime + decayTime * 0.24);
+
+          noteGain.gain.setValueAtTime(0.0001, startTime);
+          noteGain.gain.linearRampToValueAtTime(velocity, startTime + 0.014);
+          noteGain.gain.exponentialRampToValueAtTime(velocity * 0.42, startTime + 0.28);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
+
+          osc1.connect(filter);
+          osc2.connect(osc2Gain);
+          osc2Gain.connect(filter);
+          osc3.connect(osc3Gain);
+          osc3Gain.connect(filter);
+
+          filter.connect(noteGain);
+          noteGain.connect(this.masterGain);
+          if (this.reverbNode) noteGain.connect(this.reverbNode);
+
+          osc1.start(startTime);
+          osc2.start(startTime);
+          osc3.start(startTime);
+
+          const stopAt = startTime + decayTime + 0.1;
+          osc1.stop(stopAt);
+          osc2.stop(stopAt);
+          osc3.stop(stopAt);
+        }
+
+        playStarNote(index, scale) {
+          if (!this.ensureContext()) return;
+          const now = this.ctx.currentTime + 0.01;
+          const freq = scale[index % scale.length];
+          this.playPluck(freq, now, 0.23, 3.0);
+          if (index >= 3) {
+            this.playPluck(freq * 0.5, now + 0.02, 0.072, 2.8);
+          }
+        }
+
+        playSecretChime() {
+          if (!this.ensureContext()) return;
+          const now = this.ctx.currentTime + 0.01;
+          this.playPluck(880.0, now, 0.13, 2.4);
+          this.playPluck(1174.66, now + 0.11, 0.11, 2.6);
+        }
+
+        playWishArpeggio() {
+          if (!this.ensureContext()) return;
+          const now = this.ctx.currentTime + 0.01;
+          const notes = [587.33, 739.99, 880.00, 1174.66, 1318.51];
+          notes.forEach((f, i) => {
+            this.playPluck(f, now + i * 0.075, 0.12, 2.6);
+          });
+        }
+
+        playPlantChime() {
+          if (!this.ensureContext()) return;
+          const now = this.ctx.currentTime + 0.01;
+          this.playPluck(523.25, now, 0.14, 2.6);
+          this.playPluck(659.25, now + 0.12, 0.13, 2.8);
+          this.playPluck(783.99, now + 0.24, 0.11, 3.0);
+        }
+
+        playCompletionChord(chordFreqs) {
+          if (!this.ensureContext()) return;
+          const now = this.ctx.currentTime + 0.04;
+          chordFreqs.forEach((freq, i) => {
+            this.playPluck(freq, now + i * 0.14, 0.13, 4.9);
+          });
+
+          const padFreqs = [chordFreqs[0], chordFreqs[1], chordFreqs[3]];
+          padFreqs.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const lp = this.ctx.createBiquadFilter();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.detune.setValueAtTime((idx - 1) * 3.2, now);
+            lp.type = 'lowpass';
+            lp.frequency.setValueAtTime(860, now);
+
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.linearRampToValueAtTime(0.04, now + 1.4);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 6.0);
+
+            osc.connect(lp);
+            lp.connect(gain);
+            gain.connect(this.masterGain);
+            if (this.reverbNode) gain.connect(this.reverbNode);
+
+            osc.start(now);
+            osc.stop(now + 6.2);
+          });
+        }
+
+        updateDragTone(proximity01, baseFreq) {
+          if (this.muted || !this.ensureContext()) return;
+          const now = this.ctx.currentTime;
+          if (!this.dragOsc) {
+            this.dragOsc = this.ctx.createOscillator();
+            this.dragFilter = this.ctx.createBiquadFilter();
+            this.dragGain = this.ctx.createGain();
+            this.dragOsc.type = 'triangle';
+            this.dragFilter.type = 'lowpass';
+            this.dragFilter.frequency.value = 680;
+            this.dragGain.gain.setValueAtTime(0.0001, now);
+
+            this.dragOsc.connect(this.dragFilter);
+            this.dragFilter.connect(this.dragGain);
+            this.dragGain.connect(this.masterGain);
+            if (this.reverbNode) this.dragGain.connect(this.reverbNode);
+            this.dragOsc.start(now);
+          }
+
+          const targetFreq = baseFreq * (0.85 + 0.15 * proximity01);
+          this.dragOsc.frequency.setTargetAtTime(targetFreq, now, 0.06);
+          this.dragGain.gain.setTargetAtTime(0.025 + 0.035 * proximity01, now, 0.06);
+        }
+
+        stopDragTone() {
+          if (this.dragOsc && this.ctx) {
+            const now = this.ctx.currentTime;
+            const osc = this.dragOsc;
+            const gain = this.dragGain;
+            this.dragOsc = null;
+            this.dragGain = null;
+            this.dragFilter = null;
+            try {
+              gain.gain.cancelScheduledValues(now);
+              gain.gain.setTargetAtTime(0.0001, now, 0.05);
+              osc.stop(now + 0.25);
+            } catch (_) {}
+          }
+        }
+      }
+
+      // ============================================================
+      // Astronomical Moon Phase, Dual Horizons & Live Countdown
+      // ============================================================
+      const cdDays = document.getElementById('cd-days');
+      const cdHours = document.getElementById('cd-hours');
+      const cdMinutes = document.getElementById('cd-minutes');
+      const cdDaysUnit = document.getElementById('cd-days-unit');
+      const cdHoursUnit = document.getElementById('cd-hours-unit');
+      const cdMinutesUnit = document.getElementById('cd-minutes-unit');
+      const countdownDisplay = document.getElementById('countdown-display');
+      const horizonClocksEl = document.getElementById('horizon-clocks');
+      const moonWrapEl = document.getElementById('moon-wrap');
+      const horizonToggleBtn = document.getElementById('horizon-toggle');
+      const targetTimestamp = new Date(CONFIG.targetDate).getTime();
+
+      const HORIZONS = [
+        { id: 'shared', label: 'Shared Sky', tint: null, rot: 0 },
+        { id: 'calgary', label: '51.04° N', tint: 'rgba(20, 34, 62, 0.28)', rot: -0.05 },
+        { id: 'costarica', label: '10.37° N', tint: 'rgba(42, 34, 48, 0.22)', rot: 0.05 }
+      ];
+      let horizonIndex = 0;
+
+      function getMoonPhaseInfo(date = new Date()) {
+        const synodicMonth = 29.53058867;
+        const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14, 0);
+        const daysSince = (date.getTime() - knownNewMoon) / 86400000;
+        const phase = ((daysSince % synodicMonth) + synodicMonth) % synodicMonth / synodicMonth; // 0..1
+
+        let name = 'New Moon';
+        if (phase < 0.03 || phase >= 0.97) name = 'New Moon';
+        else if (phase < 0.22) name = 'Waxing Crescent';
+        else if (phase < 0.28) name = 'First Quarter';
+        else if (phase < 0.47) name = 'Waxing Gibbous';
+        else if (phase < 0.53) name = 'Full Moon';
+        else if (phase < 0.72) name = 'Waning Gibbous';
+        else if (phase < 0.78) name = 'Last Quarter';
+        else name = 'Waning Crescent';
+
+        return { phase, name };
+      }
+
+      function renderMoonSvg(phase) {
+        // Clean minimalist SVG representation of current lunar illumination
+        const waxing = phase <= 0.5;
+        const k = Math.cos(phase * Math.PI * 2); // 1 new, 0 quarter, -1 full
+        const rx = Math.abs(k) * 8;
+        const sweep1 = waxing ? 1 : 0;
+        const sweep2 = (waxing ? (k > 0 ? 0 : 1) : (k > 0 ? 1 : 0));
+        const d = (phase < 0.02 || phase > 0.98)
+          ? ''
+          : (Math.abs(phase - 0.5) < 0.02)
+            ? 'M12,4 A8,8 0 1,1 11.99,4 Z'
+            : `M12,4 A8,8 0 0,${sweep1} 12,20 A${rx.toFixed(2)},8 0 0,${sweep2} 12,4 Z`;
+
+        return `<svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="rgba(226,192,141,0.45)" stroke-width="1.3"></circle>
+          ${d ? `<path d="${d}" fill="rgba(226,192,141,0.82)"></path>` : ''}
+        </svg>`;
+      }
+
+      function formatZoneTime(tz) {
+        try {
+          return new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(new Date());
+        } catch (_) {
+          return '--:--';
+        }
+      }
+
+      function updateTelemetry() {
+        const now = Date.now();
+        const diff = targetTimestamp - now;
+
+        if (diff <= 0) {
+          countdownDisplay.textContent = 'Together under the same sky';
+        } else {
+          const totalMinutes = Math.floor(diff / 60000);
+          const days = Math.floor(totalMinutes / (60 * 24));
+          const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+          const minutes = totalMinutes % 60;
+
+          cdDays.textContent = String(days);
+          cdHours.textContent = String(hours).padStart(2, '0');
+          cdMinutes.textContent = String(minutes).padStart(2, '0');
+          cdDaysUnit.textContent = days === 1 ? 'Day' : 'Days';
+          cdHoursUnit.textContent = hours === 1 ? 'Hour' : 'Hours';
+          cdMinutesUnit.textContent = minutes === 1 ? 'Minute' : 'Minutes';
+        }
+
+        const tNorth = formatZoneTime('America/Edmonton');
+        const tSouth = formatZoneTime('America/Costa_Rica');
+        const h = HORIZONS[horizonIndex];
+        horizonClocksEl.textContent = h.id === 'shared'
+          ? `${tNorth} N · ${tSouth} S`
+          : `${h.label} · ${h.id === 'calgary' ? tNorth : tSouth}`;
+
+        const moon = getMoonPhaseInfo(new Date());
+        moonWrapEl.innerHTML = `${renderMoonSvg(moon.phase)} ${moon.name}`;
+      }
+
+      updateTelemetry();
+      setInterval(updateTelemetry, 15000);
+
+      // ============================================================
+      // Persistence (Wishes, Discovered Secrets, Planted Stars, URL Hash)
+      // ============================================================
+      const STORAGE_KEY = 'under_the_same_sky_state_v2';
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) return JSON.parse(raw);
+        } catch (_) {}
+        return { wishes: 0, secrets: {}, planted: [] };
+      }
+
+      const savedState = loadState();
+      if (!savedState.secrets) savedState.secrets = {};
+      if (!Array.isArray(savedState.planted)) savedState.planted = [];
+      if (typeof savedState.wishes !== 'number') savedState.wishes = 0;
+
+      function persistState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedState));
+        } catch (_) {}
+      }
+
+      function encodeSharedStars(list) {
+        const compact = list.slice(0, 12).map((s) => [
+          Math.round(s.nx * 1000) / 1000,
+          Math.round(s.ny * 1000) / 1000,
+          s.text.slice(0, 160)
+        ]);
+        const json = JSON.stringify(compact);
+        const bytes = new TextEncoder().encode(json);
+        let bin = '';
+        bytes.forEach((b) => { bin += String.fromCharCode(b); });
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      function decodeSharedStars(hashStr) {
+        try {
+          const b64 = hashStr.replace(/-/g, '+').replace(/_/g, '/');
+          const bin = atob(b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const arr = JSON.parse(new TextDecoder().decode(bytes));
+          if (!Array.isArray(arr)) return [];
+          return arr
+            .filter((item) => Array.isArray(item) && typeof item[0] === 'number' && typeof item[1] === 'number' && typeof item[2] === 'string')
+            .slice(0, 12)
+            .map((item, idx) => ({
+              id: 'shared_' + idx,
+              nx: Math.min(0.94, Math.max(0.06, item[0])),
+              ny: Math.min(0.88, Math.max(0.10, item[1])),
+              text: item[2].slice(0, 160),
+              shared: true
+            }));
+        } catch (_) {
+          return [];
+        }
+      }
+
+      let sharedPlantedStars = [];
+      if (window.location.hash && window.location.hash.startsWith('#sky=')) {
+        sharedPlantedStars = decodeSharedStars(window.location.hash.slice(5));
+      }
+
+      // ============================================================
+      // DOM References
+      // ============================================================
+      const canvas = document.getElementById('sky-canvas');
+      const ctx = canvas.getContext('2d');
+      const chapterBadgeEl = document.getElementById('chapter-badge');
+      const secretsCountEl = document.getElementById('secrets-count');
+      const wishesCountEl = document.getElementById('wishes-count');
+      const introPrompt = document.getElementById('intro-prompt');
+      const introPromptMain = document.getElementById('intro-prompt-main');
+      const noteCardContainer = document.getElementById('note-card-container');
+      const noteCard = document.getElementById('note-card');
+      const noteIndexEl = document.getElementById('note-index');
+      const noteDotsEl = document.getElementById('note-dots');
+      const noteTextEl = document.getElementById('note-text');
+      const noteHintEl = document.getElementById('note-hint');
+      const forkChoicesEl = document.getElementById('fork-choices');
+      const forkBtnA = document.getElementById('fork-btn-a');
+      const forkBtnB = document.getElementById('fork-btn-b');
+      const finalCardContainer = document.getElementById('final-card-container');
+      const finalDedicationEl = document.getElementById('final-dedication');
+      const finalMessageEl = document.getElementById('final-message');
+      const finalSubnoteEl = document.getElementById('final-subnote');
+      const nextChapterBtn = document.getElementById('next-chapter-btn');
+      const harpModeBtn = document.getElementById('harp-mode-btn');
+      const replayBtn = document.getElementById('replay-btn');
+      const audioToggle = document.getElementById('audio-toggle');
+      const skyToast = document.getElementById('sky-toast');
+      const skyToastLabel = document.getElementById('sky-toast-label');
+      const skyToastText = document.getElementById('sky-toast-text');
+      const modeBanner = document.getElementById('mode-banner');
+      const modeBannerText = document.getElementById('mode-banner-text');
+      const modeBannerExit = document.getElementById('mode-banner-exit');
+
+      // Dock & Sheets
+      const dockSkies = document.getElementById('dock-skies');
+      const dockCapsules = document.getElementById('dock-capsules');
+      const dockPlant = document.getElementById('dock-plant');
+      const dockHarp = document.getElementById('dock-harp');
+      const dockHarpSep = document.getElementById('dock-harp-sep');
+      const capsuleDot = document.getElementById('capsule-dot');
+
+      const sheetSkies = document.getElementById('sheet-skies');
+      const sheetCapsules = document.getElementById('sheet-capsules');
+      const sheetPlant = document.getElementById('sheet-plant');
+      const chaptersListEl = document.getElementById('chapters-list');
+      const moodsListEl = document.getElementById('moods-list');
+      const capsuleListEl = document.getElementById('capsule-list');
+      const plantInput = document.getElementById('plant-input');
+      const plantCharCount = document.getElementById('plant-char-count');
+      const pickSpotBtn = document.getElementById('pick-spot-btn');
+      const confirmPlantBtn = document.getElementById('confirm-plant-btn');
+      const plantedListWrap = document.getElementById('planted-list-wrap');
+      const plantedListEl = document.getElementById('planted-list');
+      const copyShareBtn = document.getElementById('copy-share-btn');
+
+      // Build 7 progress dots
+      const dotElements = [];
+      for (let i = 0; i < 7; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'note-dot';
+        noteDotsEl.appendChild(dot);
+        dotElements.push(dot);
+      }
+
+      const audio = new SkyAudio();
+      const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ============================================================
+      // Scene & Gameplay State
+      // ============================================================
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+      let dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+
+      let currentSkyId = 'chapter1';
+      let currentSky = SKIES.chapter1;
+      let chosenBranch = null; // null | 'optionA' | 'optionB'
+      let activeStarTexts = [...SKIES.chapter1.stars];
+      let awaitingFork = false;
+
+      let bgStars = [];
+      let shootingStars = [];
+      let particles = []; // stardust particles for wishes & drag sparks
+      let nextShootingStarAt = 0;
+
+      let constellationStars = [];
+      let forkPreviewStars = []; // 2 simultaneous target stars during a fork
+      let secretStars = [];
+      let lines = [];
+      let ripples = [];
+
+      let litCount = 0;
+      let showingFinalCard = false;
+      let completedAt = 0;
+      let constellationGlow = 0;
+      let lastAdvanceAt = 0;
+      let finalAutoTimer = null;
+      let noteSwapTimer = null;
+      let toastTimer = null;
+
+      // Interactive modes
+      let harpMode = false;
+      let plantingMode = false;
+      let pendingPlantCoord = null; // { nx, ny }
+      let lastHarpStrumIndex = -1;
+      let lastHarpStrumAt = 0;
+
+      // Drag-to-connect state
+      const drag = {
+        active: false,
+        fromIndex: -1,
+        startX: 0,
+        startY: 0,
+        curX: 0,
+        curY: 0,
+        moved: false
+      };
+
+      // Pointer & Lantern tracking
+      const pointer = {
+        x: 0.5,
+        y: 0.5,
+        smoothX: 0.5,
+        smoothY: 0.5,
+        clientX: -999,
+        clientY: -999,
+        active: false,
+        down: false
+      };
+
+      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+      function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+      function showToast(label, text, duration = 4400) {
+        clearTimeout(toastTimer);
+        skyToastLabel.textContent = label;
+        skyToastText.textContent = text;
+        skyToast.classList.add('visible');
+        toastTimer = setTimeout(() => {
+          skyToast.classList.remove('visible');
+        }, duration);
+      }
+
+      function updateDiscoveryCounters() {
+        const discovered = secretStars.filter((s) => s.found).length;
+        secretsCountEl.textContent = `${discovered}/${secretStars.length}`;
+        wishesCountEl.textContent = String(savedState.wishes);
+      }
+
+      // ============================================================
+      // Layout & Safe Sky Bounds
+      // ============================================================
+      function getSafeBounds() {
+        const isPortrait = height / width > 1.02;
+        const topSafe = isPortrait ? Math.max(142, height * 0.19) : Math.max(106, height * 0.17);
+        const bottomReserve = isPortrait ? Math.max(222, height * 0.30) : Math.max(225, height * 0.33);
+        const usableHeight = Math.max(170, height - topSafe - bottomReserve);
+        const sidePad = isPortrait ? Math.max(24, width * 0.06) : Math.max(52, width * 0.08);
+        const usableWidth = Math.max(220, width - sidePad * 2);
+        return { isPortrait, topSafe, usableHeight, sidePad, usableWidth };
+      }
+
+      function mapNormalizedToSky(nx, ny) {
+        const b = getSafeBounds();
+        return {
+          x: b.sidePad + nx * b.usableWidth,
+          y: b.topSafe + ny * b.usableHeight
+        };
+      }
+
+      function mapClientToNormalized(cx, cy) {
+        const b = getSafeBounds();
+        return {
+          nx: Math.min(0.95, Math.max(0.05, (cx - b.sidePad) / b.usableWidth)),
+          ny: Math.min(0.94, Math.max(0.04, (cy - b.topSafe) / b.usableHeight))
+        };
+      }
+
+      function getCurrentLayoutPoints() {
+        const isPortrait = height / width > 1.02;
+        const base = isPortrait ? currentSky.layoutPortrait : currentSky.layoutLandscape;
+        const pts = base.map((p) => ({ x: p.x, y: p.y }));
+
+        if (currentSky.fork && chosenBranch) {
+          const branch = currentSky.fork[chosenBranch];
+          const bPts = isPortrait ? branch.layoutPortrait : branch.layoutLandscape;
+          const startIdx = currentSky.fork.atIndex;
+          for (let i = 0; i < bPts.length && startIdx + i < pts.length; i++) {
+            pts[startIdx + i] = { x: bPts[i].x, y: bPts[i].y };
+          }
+        }
+        return pts;
+      }
+
+      function computeConstellationPositions() {
+        const pts = getCurrentLayoutPoints();
+        if (constellationStars.length !== 7) {
+          constellationStars = [];
+          for (let i = 0; i < 7; i++) {
+            constellationStars.push({ index: i, x: 0, y: 0, lit: false, litAt: 0, pulsePhase: i * 0.9, strumAt: 0 });
+          }
+        }
+        for (let i = 0; i < 7; i++) {
+          const p = mapNormalizedToSky(pts[i].x, pts[i].y);
+          constellationStars[i].x = p.x;
+          constellationStars[i].y = p.y;
+        }
+
+        // Update fork preview star coordinates if currently at a fork
+        if (currentSky.fork) {
+          const isPortrait = height / width > 1.02;
+          const ptA = (isPortrait ? currentSky.fork.optionA.layoutPortrait : currentSky.fork.optionA.layoutLandscape)[0];
+          const ptB = (isPortrait ? currentSky.fork.optionB.layoutPortrait : currentSky.fork.optionB.layoutLandscape)[0];
+          const pA = mapNormalizedToSky(ptA.x, ptA.y);
+          const pB = mapNormalizedToSky(ptB.x, ptB.y);
+          forkPreviewStars = [
+            { branchKey: 'optionA', label: currentSky.fork.optionA.label, x: pA.x, y: pA.y },
+            { branchKey: 'optionB', label: currentSky.fork.optionB.label, x: pB.x, y: pB.y }
+          ];
+        } else {
+          forkPreviewStars = [];
+        }
+
+        // Position hidden whisper stars
+        secretStars.forEach((sec) => {
+          const p = mapNormalizedToSky(sec.nx, sec.ny);
+          sec.x = p.x;
+          sec.y = p.y;
+        });
+      }
+
+      function initBackgroundStars() {
+        const area = width * height;
+        const count = Math.max(120, Math.min(245, Math.floor(area / 6000)));
+        bgStars = [];
+        for (let i = 0; i < count; i++) {
+          const depthRoll = Math.random();
+          let layer = 0;
+          if (depthRoll > 0.84) layer = 2;
+          else if (depthRoll > 0.48) layer = 1;
+
+          const baseRadius = layer === 0 ? 0.55 + Math.random() * 0.45
+                           : layer === 1 ? 0.8 + Math.random() * 0.65
+                           : 1.1 + Math.random() * 0.75;
+          const baseAlpha = layer === 0 ? 0.16 + Math.random() * 0.25
+                          : layer === 1 ? 0.26 + Math.random() * 0.34
+                          : 0.42 + Math.random() * 0.36;
+
+          const tintRoll = Math.random();
+          let color = '248, 250, 252';
+          if (tintRoll < 0.34) color = '148, 163, 184';
+          else if (tintRoll > 0.89) color = '226, 192, 141';
+
+          bgStars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            layer,
+            radius: baseRadius,
+            baseAlpha,
+            color,
+            twinkleSpeed: 0.35 + Math.random() * 0.95,
+            twinklePhase: Math.random() * Math.PI * 2,
+            driftX: (layer === 0 ? 0.015 : layer === 1 ? 0.030 : 0.052) * (prefersReducedMotion ? 0.2 : 1),
+            driftY: (layer === 0 ? -0.007 : layer === 1 ? -0.015 : -0.025) * (prefersReducedMotion ? 0.2 : 1)
+          });
+        }
+      }
+
+      function resizeCanvas() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        initBackgroundStars();
+        computeConstellationPositions();
+      }
+
+      // ============================================================
+      // Loading a Sky (Chapter or Mood)
+      // ============================================================
+      function loadSky(skyId, resetOnly = false) {
+        clearTimeout(finalAutoTimer);
+        clearTimeout(noteSwapTimer);
+
+        currentSkyId = skyId;
+        currentSky = SKIES[skyId] || SKIES.chapter1;
+        chosenBranch = null;
+        awaitingFork = false;
+        activeStarTexts = [...currentSky.stars];
+
+        litCount = 0;
+        showingFinalCard = false;
+        completedAt = 0;
+        constellationGlow = 0;
+        lines = [];
+        ripples = [];
+        exitSpecialModes(false);
+
+        finalCardContainer.classList.remove('visible');
+        noteCardContainer.classList.remove('visible');
+        forkChoicesEl.classList.remove('active');
+        dockHarp.style.display = 'none';
+        dockHarpSep.style.display = 'none';
+
+        chapterBadgeEl.textContent = currentSky.badge;
+
+        constellationStars = [];
+        for (let i = 0; i < 7; i++) {
+          constellationStars.push({ index: i, x: 0, y: 0, lit: false, litAt: 0, pulsePhase: i * 0.9, strumAt: 0 });
+        }
+
+        // Load hidden whisper stars for this sky
+        secretStars = (currentSky.secrets || []).map((sec, idx) => {
+          const key = `${skyId}_${idx}`;
+          return {
+            key,
+            nx: sec.x,
+            ny: sec.y,
+            x: 0,
+            y: 0,
+            text: sec.text,
+            found: Boolean(savedState.secrets[key]),
+            revealAlpha: savedState.secrets[key] ? 1 : 0,
+            pulsePhase: idx * 1.7
+          };
+        });
+
+        computeConstellationPositions();
+        updateDiscoveryCounters();
+        renderSkiesSheet();
+
+        introPromptMain.textContent = resetOnly
+          ? 'Touch or drag from the glowing star to trace the sky'
+          : `${currentSky.title} — touch the glowing star to begin`;
+
+        setTimeout(() => {
+          if (litCount === 0 && !plantingMode) {
+            introPrompt.classList.add('visible');
+          }
+        }, 420);
+      }
+
+      // ============================================================
+      // Progression, Fork Branching & UI Cards
+      // ============================================================
+      function updateDots(activeIdx) {
+        dotElements.forEach((dot, i) => {
+          dot.classList.toggle('lit', i < litCount);
+          dot.classList.toggle('active', i === activeIdx);
+        });
+      }
+
+      function showNoteCard(starIndex) {
+        const text = activeStarTexts[starIndex] || '';
+        noteIndexEl.textContent = `${ROMAN[starIndex]}  /  VII`;
+        updateDots(starIndex);
+
+        // Check if next step is a branching fork
+        const isBeforeFork = Boolean(currentSky.fork && !chosenBranch && litCount === currentSky.fork.atIndex);
+        awaitingFork = isBeforeFork;
+
+        if (isBeforeFork) {
+          forkBtnA.textContent = currentSky.fork.optionA.label;
+          forkBtnB.textContent = currentSky.fork.optionB.label;
+          forkChoicesEl.classList.add('active');
+          noteHintEl.textContent = 'Choose a glowing star in the sky or select a path above';
+        } else {
+          forkChoicesEl.classList.remove('active');
+          if (starIndex === 6) {
+            noteHintEl.textContent = 'Tap anywhere to open the letter';
+          } else {
+            noteHintEl.textContent = 'Drag to the next star, tap it, or tap anywhere';
+          }
+        }
+
+        if (!noteCardContainer.classList.contains('visible')) {
+          noteTextEl.textContent = text;
+          noteTextEl.classList.remove('fading');
+          requestAnimationFrame(() => {
+            noteCardContainer.classList.add('visible');
+          });
+        } else {
+          clearTimeout(noteSwapTimer);
+          noteTextEl.classList.add('fading');
+          noteSwapTimer = setTimeout(() => {
+            noteTextEl.textContent = text;
+            noteTextEl.classList.remove('fading');
+          }, 240);
+        }
+      }
+
+      function selectBranch(branchKey, now) {
+        if (!currentSky.fork || chosenBranch) return;
+        chosenBranch = branchKey;
+        awaitingFork = false;
+        forkChoicesEl.classList.remove('active');
+
+        const branch = currentSky.fork[branchKey];
+        activeStarTexts = [...currentSky.stars, ...branch.stars];
+        computeConstellationPositions();
+        igniteNextStar(now);
+      }
+
+      function openFinalCard() {
+        if (showingFinalCard) return;
+        showingFinalCard = true;
+        clearTimeout(finalAutoTimer);
+
+        finalDedicationEl.textContent = currentSky.finalDedication || 'For Peyton';
+
+        if (currentSky.fork && chosenBranch) {
+          const branch = currentSky.fork[chosenBranch];
+          finalMessageEl.textContent = branch.finalMessage;
+          finalSubnoteEl.textContent = branch.finalSubnote || '';
+        } else {
+          finalMessageEl.textContent = currentSky.finalMessage;
+          finalSubnoteEl.textContent = currentSky.finalSubnote || '';
+        }
+
+        if (currentSky.nextId && SKIES[currentSky.nextId]) {
+          nextChapterBtn.style.display = 'inline-flex';
+          nextChapterBtn.textContent = `Continue · ${SKIES[currentSky.nextId].badge}`;
+        } else {
+          nextChapterBtn.style.display = 'none';
+        }
+
+        dockHarp.style.display = 'inline-flex';
+        dockHarpSep.style.display = 'inline-block';
+
+        noteCardContainer.classList.remove('visible');
+        setTimeout(() => {
+          if (showingFinalCard && !harpMode) {
+            finalCardContainer.classList.add('visible');
+          }
+        }, 400);
+      }
+
+      function spawnStardust(x, y, count = 14) {
+        for (let i = 0; i < count; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const sp = 18 + Math.random() * 68;
+          particles.push({
+            x,
+            y,
+            vx: Math.cos(a) * sp,
+            vy: Math.sin(a) * sp,
+            size: 0.9 + Math.random() * 1.5,
+            startTime: performance.now(),
+            duration: 750 + Math.random() * 650,
+            gold: Math.random() < 0.65
+          });
+        }
+      }
+
+      function igniteNextStar(now) {
+        if (litCount >= 7) return;
+        if (awaitingFork) return;
+
+        const idx = litCount;
+        const star = constellationStars[idx];
+        star.lit = true;
+        star.litAt = now;
+        litCount += 1;
+        lastAdvanceAt = now;
+
+        if (idx === 0) {
+          introPrompt.classList.remove('visible');
+        }
+
+        ripples.push({ x: star.x, y: star.y, startTime: now, duration: 1350, maxRadius: 56, gold: true });
+        ripples.push({ x: star.x, y: star.y, startTime: now + 150, duration: 1650, maxRadius: 84, gold: false });
+        spawnStardust(star.x, star.y, 10);
+
+        if (idx > 0) {
+          lines.push({ fromIndex: idx - 1, toIndex: idx, startTime: now, duration: 900 });
+        }
+
+        audio.playStarNote(idx, currentSky.scale);
+        showNoteCard(idx);
+
+        if (litCount === 7) {
+          completedAt = now;
+          setTimeout(() => {
+            if (litCount === 7 && currentSkyId === currentSky.id) {
+              audio.playCompletionChord(currentSky.chord);
+            }
+          }, 740);
+
+          clearTimeout(finalAutoTimer);
+          finalAutoTimer = setTimeout(() => {
+            if (litCount === 7 && !showingFinalCard && !harpMode) {
+              openFinalCard();
+            }
+          }, 5600);
+        }
+      }
+
+      // ============================================================
+      // Special Modes: Free Harp & Plant a Star
+      // ============================================================
+      function enterHarpMode() {
+        plantingMode = false;
+        harpMode = true;
+        finalCardContainer.classList.remove('visible');
+        noteCardContainer.classList.remove('visible');
+        dockHarp.classList.add('active');
+        dockPlant.classList.remove('active');
+        modeBannerText.textContent = 'Sky Harp · Tap or glide across the stars';
+        modeBannerExit.textContent = 'Return';
+        modeBanner.classList.add('visible');
+      }
+
+      function enterPlantingMode() {
+        harpMode = false;
+        plantingMode = true;
+        closeAllSheets();
+        introPrompt.classList.remove('visible');
+        dockPlant.classList.add('active');
+        dockHarp.classList.remove('active');
+        modeBannerText.textContent = 'Touch anywhere in the sky to place a star';
+        modeBannerExit.textContent = 'Cancel';
+        modeBanner.classList.add('visible');
+      }
+
+      function exitSpecialModes(restoreFinal = true) {
+        const wasHarp = harpMode;
+        harpMode = false;
+        plantingMode = false;
+        dockHarp.classList.remove('active');
+        dockPlant.classList.remove('active');
+        modeBanner.classList.remove('visible');
+
+        if (wasHarp && restoreFinal && litCount === 7) {
+          showingFinalCard = true;
+          finalCardContainer.classList.add('visible');
+        }
+      }
+
+      function strumStar(star, now) {
+        star.strumAt = now;
+        lastHarpStrumIndex = star.index;
+        lastHarpStrumAt = now;
+        audio.playStarNote(star.index, currentSky.scale);
+        ripples.push({ x: star.x, y: star.y, startTime: now, duration: 1100, maxRadius: 46, gold: true });
+        spawnStardust(star.x, star.y, 6);
+        showToast(`${ROMAN[star.index]} · ${currentSky.badge}`, activeStarTexts[star.index], 3400);
+      }
+
+      // ============================================================
+      // Pointer, Drag-to-Connect, Secret Stars, Wishes & Harp Events
+      // ============================================================
+      function getHitRadius() { return width < 760 ? 48 : 38; }
+
+      function getStarOffset(x, y) {
+        const px = (pointer.smoothX - 0.5) * -10;
+        const py = (pointer.smoothY - 0.5) * -7;
+        return { x: x + px, y: y + py };
+      }
+
+      function getAllPlantedStars() {
+        return [...sharedPlantedStars, ...savedState.planted];
+      }
+
+      function checkCatchShootingStar(clientX, clientY, now) {
+        for (let i = shootingStars.length - 1; i >= 0; i--) {
+          const st = shootingStars[i];
+          const elapsed = now - st.startTime;
+          const tSec = elapsed / 1000;
+          const headX = st.x + st.vx * tSec;
+          const headY = st.y + st.vy * tSec;
+          const speedMag = Math.hypot(st.vx, st.vy);
+          const midX = headX - (st.vx / speedMag) * (st.length * 0.45);
+          const midY = headY - (st.vy / speedMag) * (st.length * 0.45);
+
+          const distHead = Math.hypot(clientX - headX, clientY - headY);
+          const distMid = Math.hypot(clientX - midX, clientY - midY);
+          if (Math.min(distHead, distMid) <= 44) {
+            shootingStars.splice(i, 1);
+            savedState.wishes += 1;
+            persistState();
+            updateDiscoveryCounters();
+
+            audio.playWishArpeggio();
+            spawnStardust(headX, headY, 22);
+            ripples.push({ x: headX, y: headY, startTime: now, duration: 1300, maxRadius: 68, gold: true });
+            const wishMsg = WISH_NOTES[(savedState.wishes - 1) % WISH_NOTES.length];
+            showToast(`Wish #${savedState.wishes}`, wishMsg, 5200);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function checkSecretStarClick(clientX, clientY, now) {
+        for (let i = 0; i < secretStars.length; i++) {
+          const sec = secretStars[i];
+          const pos = getStarOffset(sec.x, sec.y);
+          const dist = Math.hypot(clientX - pos.x, clientY - pos.y);
+          if (dist <= 34 && (sec.found || sec.revealAlpha > 0.22)) {
+            if (!sec.found) {
+              sec.found = true;
+              savedState.secrets[sec.key] = true;
+              persistState();
+              updateDiscoveryCounters();
+              spawnStardust(sec.x, sec.y, 14);
+            }
+            audio.playSecretChime();
+            ripples.push({ x: sec.x, y: sec.y, startTime: now, duration: 1200, maxRadius: 48, gold: true });
+            showToast('Secret Star Discovered', sec.text, 5200);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function checkPlantedStarClick(clientX, clientY, now) {
+        const list = getAllPlantedStars();
+        for (let i = 0; i < list.length; i++) {
+          const ps = list[i];
+          const mapped = mapNormalizedToSky(ps.nx, ps.ny);
+          const pos = getStarOffset(mapped.x, mapped.y);
+          if (Math.hypot(clientX - pos.x, clientY - pos.y) <= 30) {
+            audio.playPlantChime();
+            ripples.push({ x: mapped.x, y: mapped.y, startTime: now, duration: 1100, maxRadius: 42, gold: false });
+            showToast(ps.shared ? 'Shared Star' : 'Your Star', ps.text, 5000);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function checkHarpHit(clientX, clientY, now, isMove = false) {
+        for (let i = 0; i < constellationStars.length; i++) {
+          const star = constellationStars[i];
+          if (!star.lit) continue;
+          const pos = getStarOffset(star.x, star.y);
+          if (Math.hypot(clientX - pos.x, clientY - pos.y) <= (isMove ? 30 : 40)) {
+            if (!isMove || i !== lastHarpStrumIndex || now - lastHarpStrumAt > 360) {
+              strumStar(star, now);
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      canvas.addEventListener('pointerdown', (e) => {
+        if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+        const now = performance.now();
+        pointer.down = true;
+        pointer.clientX = e.clientX;
+        pointer.clientY = e.clientY;
+
+        // 1. Planting mode: pick spot on canvas
+        if (plantingMode) {
+          pendingPlantCoord = mapClientToNormalized(e.clientX, e.clientY);
+          exitSpecialModes(false);
+          openSheet(sheetPlant);
+          plantInput.focus();
+          return;
+        }
+
+        // 2. Always allow catching shooting stars first!
+        if (checkCatchShootingStar(e.clientX, e.clientY, now)) return;
+
+        // 3. Free Harp mode
+        if (harpMode) {
+          checkHarpHit(e.clientX, e.clientY, now, false);
+          return;
+        }
+
+        // 4. Hidden whisper stars or user-planted stars
+        if (checkSecretStarClick(e.clientX, e.clientY, now)) return;
+        if (checkPlantedStarClick(e.clientX, e.clientY, now)) return;
+
+        // 5. Check if starting a Drag-to-Connect from the last lit star
+        if (litCount > 0 && litCount < 7) {
+          const lastStar = constellationStars[litCount - 1];
+          const pos = getStarOffset(lastStar.x, lastStar.y);
+          if (Math.hypot(e.clientX - pos.x, e.clientY - pos.y) <= getHitRadius() + 12) {
+            drag.active = true;
+            drag.fromIndex = litCount - 1;
+            drag.startX = e.clientX;
+            drag.startY = e.clientY;
+            drag.curX = e.clientX;
+            drag.curY = e.clientY;
+            drag.moved = false;
+            return;
+          }
+        }
+
+        // 6. Standard tap/click interaction
+        handleSkyTap(e.clientX, e.clientY, now);
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        const now = performance.now();
+        pointer.clientX = e.clientX;
+        pointer.clientY = e.clientY;
+        if (e.pointerType === 'mouse') {
+          pointer.x = e.clientX / Math.max(width, 1);
+          pointer.y = e.clientY / Math.max(height, 1);
+          pointer.active = true;
+        }
+
+        // Harp mode strumming on drag
+        if (harpMode && pointer.down) {
+          checkHarpHit(e.clientX, e.clientY, now, true);
+          return;
+        }
+
+        // Drag-to-connect constellation line
+        if (drag.active) {
+          drag.curX = e.clientX;
+          drag.curY = e.clientY;
+          if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 14) {
+            drag.moved = true;
+          }
+
+          // Check magnetic snap to next star (or either fork star)
+          const targets = awaitingFork
+            ? forkPreviewStars.map((f) => ({ x: f.x, y: f.y, branchKey: f.branchKey }))
+            : [{ x: constellationStars[litCount].x, y: constellationStars[litCount].y, branchKey: null }];
+
+          let bestProx = 0;
+          for (let i = 0; i < targets.length; i++) {
+            const t = targets[i];
+            const pos = getStarOffset(t.x, t.y);
+            const dist = Math.hypot(e.clientX - pos.x, e.clientY - pos.y);
+            const prox = Math.max(0, 1 - dist / 260);
+            if (prox > bestProx) bestProx = prox;
+
+            if (dist <= getHitRadius() + 6) {
+              drag.active = false;
+              audio.stopDragTone();
+              if (t.branchKey) {
+                selectBranch(t.branchKey, now);
+              } else {
+                igniteNextStar(now);
+              }
+              return;
+            }
+          }
+
+          audio.updateDragTone(bestProx, currentSky.scale[litCount % currentSky.scale.length]);
+        }
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        pointer.down = false;
+        lastHarpStrumIndex = -1;
+        if (drag.active) {
+          const wasMoved = drag.moved;
+          drag.active = false;
+          audio.stopDragTone();
+          // If user merely tapped the last lit star without dragging, advance gently
+          if (!wasMoved && !awaitingFork) {
+            handleSkyTap(e.clientX, e.clientY, performance.now());
+          }
+        }
+      });
+
+      function handleSkyTap(clientX, clientY, now) {
+        if (now - lastAdvanceAt < 360) return;
+
+        // If at a branching fork, require tapping one of the two glowing choice stars
+        if (awaitingFork) {
+          for (let i = 0; i < forkPreviewStars.length; i++) {
+            const f = forkPreviewStars[i];
+            const pos = getStarOffset(f.x, f.y);
+            if (Math.hypot(clientX - pos.x, clientY - pos.y) <= getHitRadius() + 14) {
+              selectBranch(f.branchKey, now);
+              return;
+            }
+          }
+          // Gentle guiding ripples on both choice stars
+          forkPreviewStars.forEach((f) => {
+            ripples.push({ x: f.x, y: f.y, startTime: now, duration: 1000, maxRadius: 42, gold: true });
+          });
+          return;
+        }
+
+        if (litCount >= 7) {
+          if (!showingFinalCard && now - lastAdvanceAt > 650) {
+            openFinalCard();
+          }
+          return;
+        }
+
+        const activeStar = constellationStars[litCount];
+        const pos = getStarOffset(activeStar.x, activeStar.y);
+        const dist = Math.hypot(clientX - pos.x, clientY - pos.y);
+
+        if (litCount === 0) {
+          if (dist <= getHitRadius()) {
+            igniteNextStar(now);
+          } else {
+            ripples.push({ x: activeStar.x, y: activeStar.y, startTime: now, duration: 1150, maxRadius: 46, gold: true });
+          }
+          return;
+        }
+
+        igniteNextStar(now);
+      }
+
+      // Double-click empty sky to plant a star directly
+      canvas.addEventListener('dblclick', (e) => {
+        if (harpMode || plantingMode) return;
+        pendingPlantCoord = mapClientToNormalized(e.clientX, e.clientY);
+        openSheet(sheetPlant);
+        plantInput.focus();
+      });
+
+      noteCard.addEventListener('click', (e) => {
+        if (e.target && e.target.closest('.fork-btn')) return;
+        e.stopPropagation();
+        if (awaitingFork) return;
+        const now = performance.now();
+        if (now - lastAdvanceAt < 360) return;
+        if (litCount < 7) igniteNextStar(now);
+        else if (!showingFinalCard && now - lastAdvanceAt > 650) openFinalCard();
+      });
+
+      forkBtnA.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectBranch('optionA', performance.now());
+      });
+
+      forkBtnB.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectBranch('optionB', performance.now());
+      });
+
+      nextChapterBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentSky.nextId) loadSky(currentSky.nextId);
+      });
+
+      harpModeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        enterHarpMode();
+      });
+
+      replayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        loadSky(currentSkyId, true);
+      });
+
+      modeBannerExit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exitSpecialModes(true);
+      });
+
+      horizonToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        horizonIndex = (horizonIndex + 1) % HORIZONS.length;
+        updateTelemetry();
+        showToast('Horizon Perspective', HORIZONS[horizonIndex].label === 'Shared Sky'
+          ? 'Viewing both horizons together'
+          : `Shifted subtly toward ${HORIZONS[horizonIndex].label}`, 2600);
+      });
+
+      audioToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nextMuted = !audio.muted;
+        if (!nextMuted) audio.ensureContext();
+        audio.setMuted(nextMuted);
+        audioToggle.classList.toggle('muted', nextMuted);
+        audioToggle.setAttribute('aria-pressed', String(nextMuted));
+        audioToggle.setAttribute('aria-label', nextMuted ? 'Unmute sound' : 'Mute sound');
+      });
+
+      window.addEventListener('touchend', () => {
+        if (!audio.muted && audio.ctx && audio.ctx.state === 'suspended') {
+          audio.ctx.resume().catch(() => {});
+        }
+      }, { passive: true });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeAllSheets();
+          if (harpMode || plantingMode) exitSpecialModes(true);
+          return;
+        }
+        if (document.querySelector('.sheet-backdrop.open')) return;
+        if (e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'TEXTAREA')) return;
+        if ((e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') && !awaitingFork && !harpMode && !plantingMode) {
+          const now = performance.now();
+          if (now - lastAdvanceAt < 360) return;
+          if (litCount < 7) igniteNextStar(now);
+          else if (!showingFinalCard && now - lastAdvanceAt > 650) openFinalCard();
+        }
+      });
+
+      // ============================================================
+      // Overlay Sheets: Skies, Capsules & Plant a Star
+      // ============================================================
+      function openSheet(el) {
+        closeAllSheets();
+        el.classList.add('open');
+      }
+
+      function closeAllSheets() {
+        sheetSkies.classList.remove('open');
+        sheetCapsules.classList.remove('open');
+        sheetPlant.classList.remove('open');
+      }
+
+      document.querySelectorAll('[data-close-sheet]').forEach((btn) => {
+        btn.addEventListener('click', closeAllSheets);
+      });
+
+      [sheetSkies, sheetCapsules, sheetPlant].forEach((backdrop) => {
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop) closeAllSheets();
+        });
+      });
+
+      function renderSkiesSheet() {
+        chaptersListEl.innerHTML = '';
+        moodsListEl.innerHTML = '';
+
+        Object.values(SKIES).forEach((sky) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sky-option' + (sky.id === currentSkyId ? ' current' : '');
+          btn.innerHTML = `
+            <div>
+              <div class="sky-option-title">${sky.title}</div>
+              <div class="sky-option-sub">${sky.subtitle}</div>
+            </div>
+            <span class="sky-option-tag">${sky.id === currentSkyId ? 'Active' : (sky.fork ? '2 Paths' : '7 Stars')}</span>
+          `;
+          btn.addEventListener('click', () => {
+            closeAllSheets();
+            loadSky(sky.id);
+          });
+          if (sky.kind === 'chapter') chaptersListEl.appendChild(btn);
+          else moodsListEl.appendChild(btn);
+        });
+      }
+
+      function renderCapsulesSheet() {
+        const now = Date.now();
+        let unlockedCount = 0;
+        capsuleListEl.innerHTML = '';
+
+        CAPSULES.forEach((cap) => {
+          const unlockTs = new Date(cap.date).getTime();
+          const unlocked = now >= unlockTs;
+          if (unlocked) unlockedCount += 1;
+
+          const daysLeft = Math.ceil((unlockTs - now) / 86400000);
+          const item = document.createElement('div');
+          item.className = 'capsule-item ' + (unlocked ? 'unlocked' : 'locked');
+          item.innerHTML = `
+            <div class="capsule-top">
+              <span class="capsule-title">${cap.title}</span>
+              <span class="capsule-status">${unlocked ? 'Open Letter' : `In ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`}</span>
+            </div>
+            <div class="capsule-date">${cap.displayDate}</div>
+            <div class="capsule-body">${unlocked ? cap.message : ''}</div>
+          `;
+          if (unlocked) {
+            item.addEventListener('click', () => {
+              const expanding = !item.classList.contains('expanded');
+              item.classList.toggle('expanded');
+              if (expanding) audio.playSecretChime();
+            });
+          }
+          capsuleListEl.appendChild(item);
+        });
+
+        capsuleDot.style.display = unlockedCount > 0 ? 'inline-block' : 'none';
+      }
+
+      function renderPlantedList() {
+        const mine = savedState.planted;
+        if (mine.length === 0) {
+          plantedListWrap.style.display = 'none';
+          return;
+        }
+        plantedListWrap.style.display = 'block';
+        plantedListEl.innerHTML = '';
+
+        mine.forEach((s) => {
+          const row = document.createElement('div');
+          row.className = 'planted-row';
+          const span = document.createElement('span');
+          span.textContent = `"${s.text}"`;
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'planted-remove';
+          del.textContent = 'Remove';
+          del.addEventListener('click', () => {
+            savedState.planted = savedState.planted.filter((x) => x.id !== s.id);
+            persistState();
+            renderPlantedList();
+          });
+          row.appendChild(span);
+          row.appendChild(del);
+          plantedListEl.appendChild(row);
+        });
+      }
+
+      plantInput.addEventListener('input', () => {
+        plantCharCount.textContent = `${plantInput.value.length} / 160`;
+      });
+
+      pickSpotBtn.addEventListener('click', () => {
+        enterPlantingMode();
+      });
+
+      confirmPlantBtn.addEventListener('click', () => {
+        const text = plantInput.value.trim();
+        if (!text) {
+          plantInput.focus();
+          return;
+        }
+        const coord = pendingPlantCoord || {
+          nx: 0.16 + Math.random() * 0.68,
+          ny: 0.14 + Math.random() * 0.66
+        };
+        const newStar = {
+          id: 'p_' + Date.now(),
+          nx: coord.nx,
+          ny: coord.ny,
+          text: text.slice(0, 160),
+          shared: false
+        };
+        savedState.planted.push(newStar);
+        persistState();
+        pendingPlantCoord = null;
+        plantInput.value = '';
+        plantCharCount.textContent = '0 / 160';
+        renderPlantedList();
+        closeAllSheets();
+
+        const mapped = mapNormalizedToSky(newStar.nx, newStar.ny);
+        audio.playPlantChime();
+        ripples.push({ x: mapped.x, y: mapped.y, startTime: performance.now(), duration: 1300, maxRadius: 52, gold: false });
+        spawnStardust(mapped.x, mapped.y, 12);
+        showToast('Star Planted', 'Your note now rests in the night sky.', 3600);
+      });
+
+      copyShareBtn.addEventListener('click', async () => {
+        if (savedState.planted.length === 0) return;
+        const encoded = encodeSharedStars(savedState.planted);
+        const url = `${window.location.origin}${window.location.pathname}#sky=${encoded}`;
+        try {
+          await navigator.clipboard.writeText(url);
+          copyShareBtn.textContent = 'Link Copied';
+          setTimeout(() => { copyShareBtn.textContent = 'Copy Sky Link'; }, 2200);
+        } catch (_) {
+          window.prompt('Copy your sky link:', url);
+        }
+      });
+
+      dockSkies.addEventListener('click', () => {
+        renderSkiesSheet();
+        openSheet(sheetSkies);
+      });
+
+      dockCapsules.addEventListener('click', () => {
+        renderCapsulesSheet();
+        openSheet(sheetCapsules);
+      });
+
+      dockPlant.addEventListener('click', () => {
+        renderPlantedList();
+        openSheet(sheetPlant);
+      });
+
+      dockHarp.addEventListener('click', () => {
+        if (harpMode) exitSpecialModes(true);
+        else enterHarpMode();
+      });
+
+      window.addEventListener('resize', resizeCanvas);
+
+      // ============================================================
+      // Shooting Stars (Graceful & Catchable)
+      // ============================================================
+      function spawnShootingStar(now) {
+        const startX = width * (0.10 + Math.random() * 0.72);
+        const startY = height * (0.08 + Math.random() * 0.30);
+        const angle = (Math.PI / 7) + Math.random() * (Math.PI / 11);
+        const dir = startX > width * 0.5 ? -1 : 1;
+        const speed = 220 + Math.random() * 110; // unhurried so it can be caught
+
+        shootingStars.push({
+          x: startX,
+          y: startY,
+          vx: Math.cos(angle) * speed * dir,
+          vy: Math.sin(angle) * speed,
+          length: 85 + Math.random() * 55,
+          startTime: now,
+          duration: 1850 + Math.random() * 650
+        });
+      }
+
+      // ============================================================
+      // Canvas Rendering Pipeline
+      // ============================================================
+      function drawSkyBackdrop() {
+        const pal = currentSky.palette;
+        const bgGrad = ctx.createRadialGradient(
+          width * 0.52, height * 0.42, 0,
+          width * 0.5, height * 0.5, Math.max(width, height) * 0.88
+        );
+        bgGrad.addColorStop(0, pal.center);
+        bgGrad.addColorStop(0.55, pal.mid);
+        bgGrad.addColorStop(1, pal.edge);
+
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Horizon atmospheric veil
+        const mistGrad = ctx.createRadialGradient(
+          width * 0.5, height * 0.99, 10,
+          width * 0.5, height * 0.99, Math.max(width, height) * 0.60
+        );
+        mistGrad.addColorStop(0, pal.horizon);
+        mistGrad.addColorStop(0.6, 'rgba(21, 31, 50, 0.08)');
+        mistGrad.addColorStop(1, 'rgba(11, 17, 32, 0)');
+        ctx.fillStyle = mistGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Subtle tint shift when toggling Calgary / Costa Rica horizon
+        const h = HORIZONS[horizonIndex];
+        if (h.tint) {
+          ctx.fillStyle = h.tint;
+          ctx.fillRect(0, 0, width, height);
+        }
+      }
+
+      function drawBackgroundStars(now, dt) {
+        const pxFactor = [4, 9, 16];
+        const offsetX = pointer.smoothX - 0.5;
+        const offsetY = pointer.smoothY - 0.5;
+        const rot = HORIZONS[horizonIndex].rot;
+
+        for (let i = 0; i < bgStars.length; i++) {
+          const s = bgStars[i];
+          s.x += (s.driftX + rot * 0.12) * dt * 0.06;
+          s.y += s.driftY * dt * 0.06;
+
+          if (s.x > width + 20) s.x = -20;
+          if (s.x < -20) s.x = width + 20;
+          if (s.y > height + 20) s.y = -20;
+          if (s.y < -20) s.y = height + 20;
+
+          const drawX = s.x - offsetX * pxFactor[s.layer];
+          const drawY = s.y - offsetY * pxFactor[s.layer];
+          const twinkle = 0.65 + 0.35 * Math.sin(now * 0.001 * s.twinkleSpeed + s.twinklePhase);
+          const alpha = s.baseAlpha * twinkle;
+
+          ctx.fillStyle = `rgba(${s.color}, ${alpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, s.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function drawStarlightLantern() {
+        if ((!pointer.active && !pointer.down) || pointer.clientX < 0 || drag.active || harpMode) return;
+        const lanternGrad = ctx.createRadialGradient(
+          pointer.clientX, pointer.clientY, 0,
+          pointer.clientX, pointer.clientY, 105
+        );
+        lanternGrad.addColorStop(0, 'rgba(226, 192, 141, 0.045)');
+        lanternGrad.addColorStop(0.55, 'rgba(148, 163, 184, 0.018)');
+        lanternGrad.addColorStop(1, 'rgba(11, 17, 32, 0)');
+        ctx.fillStyle = lanternGrad;
+        ctx.beginPath();
+        ctx.arc(pointer.clientX, pointer.clientY, 105, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawShootingStars(now) {
+        if (!prefersReducedMotion && now >= nextShootingStarAt) {
+          spawnShootingStar(now);
+          nextShootingStarAt = now + 10000 + Math.random() * 10000;
+        }
+
+        for (let i = shootingStars.length - 1; i >= 0; i--) {
+          const st = shootingStars[i];
+          const elapsed = now - st.startTime;
+          const progress = elapsed / st.duration;
+          if (progress >= 1) {
+            shootingStars.splice(i, 1);
+            continue;
+          }
+
+          const tSec = elapsed / 1000;
+          const headX = st.x + st.vx * tSec;
+          const headY = st.y + st.vy * tSec;
+          const speedMag = Math.hypot(st.vx, st.vy);
+          const tailX = headX - (st.vx / speedMag) * st.length;
+          const tailY = headY - (st.vy / speedMag) * st.length;
+
+          const fade = Math.sin(progress * Math.PI);
+          const alpha = fade * 0.68;
+
+          const grad = ctx.createLinearGradient(tailX, tailY, headX, headY);
+          grad.addColorStop(0, 'rgba(248, 250, 252, 0)');
+          grad.addColorStop(0.7, `rgba(226, 192, 141, ${(alpha * 0.5).toFixed(3)})`);
+          grad.addColorStop(1, `rgba(248, 250, 252, ${alpha.toFixed(3)})`);
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.35;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(tailX, tailY);
+          ctx.lineTo(headX, headY);
+          ctx.stroke();
+
+          // Soft catchable head halo
+          const headGrad = ctx.createRadialGradient(headX, headY, 0, headX, headY, 11);
+          headGrad.addColorStop(0, `rgba(248, 250, 252, ${(alpha * 0.95).toFixed(3)})`);
+          headGrad.addColorStop(0.4, `rgba(226, 192, 141, ${(alpha * 0.35).toFixed(3)})`);
+          headGrad.addColorStop(1, 'rgba(226, 192, 141, 0)');
+          ctx.fillStyle = headGrad;
+          ctx.beginPath();
+          ctx.arc(headX, headY, 11, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function drawParticles(now) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          const elapsed = now - p.startTime;
+          const prog = elapsed / p.duration;
+          if (prog >= 1) {
+            particles.splice(i, 1);
+            continue;
+          }
+          const tSec = elapsed / 1000;
+          const dragDecay = 1 - prog * 0.4;
+          const x = p.x + p.vx * tSec * dragDecay;
+          const y = p.y + p.vy * tSec * dragDecay;
+          const alpha = (1 - easeOutCubic(prog)) * 0.78;
+          ctx.fillStyle = p.gold
+            ? `rgba(226, 192, 141, ${alpha.toFixed(3)})`
+            : `rgba(248, 250, 252, ${alpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(x, y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function drawSecretAndPlantedStars(now) {
+        // Hidden whisper stars (revealed gently by lantern proximity or once found)
+        for (let i = 0; i < secretStars.length; i++) {
+          const sec = secretStars[i];
+          const pos = getStarOffset(sec.x, sec.y);
+
+          if (!sec.found) {
+            const dist = pointer.clientX >= 0 ? Math.hypot(pointer.clientX - pos.x, pointer.clientY - pos.y) : 999;
+            const targetReveal = dist < 135 ? Math.min(1, (135 - dist) / 85) : 0;
+            const rate = targetReveal > sec.revealAlpha ? 0.14 : 0.035;
+            sec.revealAlpha += (targetReveal - sec.revealAlpha) * rate;
+          } else {
+            sec.revealAlpha = 1;
+          }
+
+          // Barely-perceptible faint glint when unfound, glowing softly when lantern nears
+          const a = Math.max(0.08, sec.revealAlpha);
+          const pulse = 0.8 + 0.2 * Math.sin(now * 0.002 + sec.pulsePhase);
+
+          if (a > 0.14) {
+            const r = 12 + a * 8;
+            const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, r);
+            g.addColorStop(0, `rgba(226, 192, 141, ${(a * 0.55 * pulse).toFixed(3)})`);
+            g.addColorStop(1, 'rgba(226, 192, 141, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (!sec.found && a > 0.3) {
+              ctx.save();
+              ctx.setLineDash([2, 3]);
+              ctx.strokeStyle = `rgba(226, 192, 141, ${(a * 0.42).toFixed(3)})`;
+              ctx.lineWidth = 0.8;
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, 11, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+
+          ctx.fillStyle = sec.found
+            ? `rgba(226, 192, 141, ${(0.78 * pulse).toFixed(3)})`
+            : `rgba(248, 250, 252, ${(a * 0.65 * pulse).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, sec.found ? 2.1 : 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // User-planted & shared stars
+        const planted = getAllPlantedStars();
+        for (let i = 0; i < planted.length; i++) {
+          const ps = planted[i];
+          const mapped = mapNormalizedToSky(ps.nx, ps.ny);
+          const pos = getStarOffset(mapped.x, mapped.y);
+          const pulse = 0.85 + 0.15 * Math.sin(now * 0.0022 + i);
+
+          const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 15);
+          g.addColorStop(0, `rgba(248, 250, 252, ${(0.72 * pulse).toFixed(3)})`);
+          g.addColorStop(0.45, `rgba(148, 163, 184, ${(0.28 * pulse).toFixed(3)})`);
+          g.addColorStop(1, 'rgba(148, 163, 184, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2);
+          ctx.fill();
+
+          drawStarCrosshair(pos.x, pos.y, 8, 0.36 * pulse, '248, 250, 252');
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function drawDragThread() {
+        if (!drag.active || drag.fromIndex < 0) return;
+        const fromStar = constellationStars[drag.fromIndex];
+        const from = getStarOffset(fromStar.x, fromStar.y);
+
+        const grad = ctx.createLinearGradient(from.x, from.y, drag.curX, drag.curY);
+        grad.addColorStop(0, 'rgba(226, 192, 141, 0.72)');
+        grad.addColorStop(1, 'rgba(248, 250, 252, 0.38)');
+
+        ctx.save();
+        ctx.setLineDash([4, 5]);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(drag.curX, drag.curY);
+        ctx.stroke();
+        ctx.restore();
+
+        const tipGrad = ctx.createRadialGradient(drag.curX, drag.curY, 0, drag.curX, drag.curY, 12);
+        tipGrad.addColorStop(0, 'rgba(248, 250, 252, 0.85)');
+        tipGrad.addColorStop(0.5, 'rgba(226, 192, 141, 0.36)');
+        tipGrad.addColorStop(1, 'rgba(226, 192, 141, 0)');
+        ctx.fillStyle = tipGrad;
+        ctx.beginPath();
+        ctx.arc(drag.curX, drag.curY, 12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawConstellationLines(now) {
+        if (lines.length === 0) return;
+        const breathe = constellationGlow > 0 ? 0.5 + 0.5 * Math.sin(now * 0.0014) : 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          const seg = lines[i];
+          const from = getStarOffset(constellationStars[seg.fromIndex].x, constellationStars[seg.fromIndex].y);
+          const to = getStarOffset(constellationStars[seg.toIndex].x, constellationStars[seg.toIndex].y);
+
+          const rawT = Math.min(1, Math.max(0, (now - seg.startTime) / seg.duration));
+          if (rawT <= 0.001) continue;
+          const t = easeInOutCubic(rawT);
+
+          const curX = from.x + (to.x - from.x) * t;
+          const curY = from.y + (to.y - from.y) * t;
+          const baseGlowBoost = constellationGlow * (0.28 + 0.14 * breathe);
+
+          ctx.save();
+          ctx.strokeStyle = `rgba(226, 192, 141, ${(0.14 + baseGlowBoost * 0.48).toFixed(3)})`;
+          ctx.lineWidth = 4.5 + constellationGlow * 2.5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+          ctx.lineTo(curX, curY);
+          ctx.stroke();
+
+          const lineGrad = ctx.createLinearGradient(from.x, from.y, curX, curY);
+          lineGrad.addColorStop(0, `rgba(226, 192, 141, ${(0.52 + baseGlowBoost * 0.4).toFixed(3)})`);
+          lineGrad.addColorStop(0.5, `rgba(248, 250, 252, ${(0.44 + baseGlowBoost * 0.42).toFixed(3)})`);
+          lineGrad.addColorStop(1, `rgba(226, 192, 141, ${(0.66 + baseGlowBoost * 0.34).toFixed(3)})`);
+
+          ctx.strokeStyle = lineGrad;
+          ctx.lineWidth = 1.15 + constellationGlow * 0.35;
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+          ctx.lineTo(curX, curY);
+          ctx.stroke();
+          ctx.restore();
+
+          if (rawT < 1) {
+            const sparkAlpha = Math.sin(rawT * Math.PI) * 0.85;
+            const sparkGrad = ctx.createRadialGradient(curX, curY, 0, curX, curY, 10);
+            sparkGrad.addColorStop(0, `rgba(248, 250, 252, ${sparkAlpha.toFixed(3)})`);
+            sparkGrad.addColorStop(0.45, `rgba(226, 192, 141, ${(sparkAlpha * 0.55).toFixed(3)})`);
+            sparkGrad.addColorStop(1, 'rgba(226, 192, 141, 0)');
+            ctx.fillStyle = sparkGrad;
+            ctx.beginPath();
+            ctx.arc(curX, curY, 10, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      function drawRipples(now) {
+        const px = (pointer.smoothX - 0.5) * -10;
+        const py = (pointer.smoothY - 0.5) * -7;
+        for (let i = ripples.length - 1; i >= 0; i--) {
+          const r = ripples[i];
+          const elapsed = now - r.startTime;
+          if (elapsed < 0) continue;
+          const p = elapsed / r.duration;
+          if (p >= 1) {
+            ripples.splice(i, 1);
+            continue;
+          }
+          const eased = easeOutCubic(p);
+          const radius = 5 + eased * r.maxRadius;
+          const alpha = (1 - eased) * (r.gold ? 0.52 : 0.28);
+          ctx.strokeStyle = r.gold
+            ? `rgba(226, 192, 141, ${alpha.toFixed(3)})`
+            : `rgba(248, 250, 252, ${alpha.toFixed(3)})`;
+          ctx.lineWidth = r.gold ? 1.15 : 0.85;
+          ctx.beginPath();
+          ctx.arc(r.x + px, r.y + py, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      function drawStarCrosshair(x, y, armLen, alpha, colorRgb) {
+        const gradH = ctx.createLinearGradient(x - armLen, y, x + armLen, y);
+        gradH.addColorStop(0, `rgba(${colorRgb}, 0)`);
+        gradH.addColorStop(0.5, `rgba(${colorRgb}, ${alpha.toFixed(3)})`);
+        gradH.addColorStop(1, `rgba(${colorRgb}, 0)`);
+        ctx.strokeStyle = gradH;
+        ctx.lineWidth = 0.85;
+        ctx.beginPath();
+        ctx.moveTo(x - armLen, y);
+        ctx.lineTo(x + armLen, y);
+        ctx.stroke();
+
+        const gradV = ctx.createLinearGradient(x, y - armLen, x, y + armLen);
+        gradV.addColorStop(0, `rgba(${colorRgb}, 0)`);
+        gradV.addColorStop(0.5, `rgba(${colorRgb}, ${alpha.toFixed(3)})`);
+        gradV.addColorStop(1, `rgba(${colorRgb}, 0)`);
+        ctx.strokeStyle = gradV;
+        ctx.beginPath();
+        ctx.moveTo(x, y - armLen);
+        ctx.lineTo(x, y + armLen);
+        ctx.stroke();
+      }
+
+      function drawPulsingBeacon(x, y, now, label = null) {
+        const pulse = 0.5 + 0.5 * Math.sin(now * 0.0024);
+        const ringCycle = (now * 0.00038) % 1;
+        const ringEase = easeOutCubic(ringCycle);
+
+        const ringRadius = 10 + ringEase * 24;
+        const ringAlpha = (1 - ringEase) * 0.34;
+        ctx.strokeStyle = `rgba(226, 192, 141, ${ringAlpha.toFixed(3)})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const haloRadius = 19 + pulse * 10;
+        const haloGrad = ctx.createRadialGradient(x, y, 0, x, y, haloRadius);
+        haloGrad.addColorStop(0, `rgba(248, 250, 252, ${(0.72 + pulse * 0.24).toFixed(3)})`);
+        haloGrad.addColorStop(0.28, `rgba(226, 192, 141, ${(0.36 + pulse * 0.24).toFixed(3)})`);
+        haloGrad.addColorStop(0.68, `rgba(226, 192, 141, ${(0.08 + pulse * 0.08).toFixed(3)})`);
+        haloGrad.addColorStop(1, 'rgba(226, 192, 141, 0)');
+
+        ctx.fillStyle = haloGrad;
+        ctx.beginPath();
+        ctx.arc(x, y, haloRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        drawStarCrosshair(x, y, 7 + pulse * 4, 0.24 + pulse * 0.18, '226, 192, 141');
+
+        ctx.fillStyle = `rgba(248, 250, 252, ${(0.82 + pulse * 0.18).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.3 + pulse * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (label) {
+          ctx.font = '300 italic 14px "Cormorant Garamond", Georgia, serif';
+          ctx.fillStyle = 'rgba(226, 192, 141, 0.85)';
+          ctx.textAlign = 'center';
+          ctx.fillText(label, x, y - 22);
+        }
+      }
+
+      function drawConstellationStars(now) {
+        let hoveringInteractive = false;
+        const hitRadius = getHitRadius();
+        const unifiedBreathe = constellationGlow > 0 ? 0.5 + 0.5 * Math.sin(now * 0.0014) : 0;
+
+        // If at a branching fork, draw both glowing choice stars
+        if (awaitingFork) {
+          forkPreviewStars.forEach((f) => {
+            const pos = getStarOffset(f.x, f.y);
+            if (pointer.active && Math.hypot(pointer.clientX - pos.x, pointer.clientY - pos.y) <= hitRadius + 14) {
+              hoveringInteractive = true;
+            }
+            drawPulsingBeacon(pos.x, pos.y, now, f.label);
+          });
+        }
+
+        for (let i = 0; i < constellationStars.length; i++) {
+          const star = constellationStars[i];
+          const pos = getStarOffset(star.x, star.y);
+          const isNext = !awaitingFork && i === litCount && litCount < 7;
+
+          // Hide unchosen future stars while before/at a branching fork
+          if (currentSky.fork && !chosenBranch && i >= currentSky.fork.atIndex) continue;
+
+          if (isNext && pointer.active && Math.hypot(pointer.clientX - pos.x, pointer.clientY - pos.y) <= hitRadius) {
+            hoveringInteractive = true;
+          }
+
+          if (star.lit) {
+            const sinceLit = Math.min(1, (now - star.litAt) / 700);
+            const sinceStrum = star.strumAt > 0 ? Math.min(1, (now - star.strumAt) / 600) : 1;
+            const flash = Math.sin(sinceLit * Math.PI) * 0.65 + Math.sin(sinceStrum * Math.PI) * 0.5;
+            const twinkle = 0.92 + 0.08 * Math.sin(now * 0.002 + star.pulsePhase);
+            const completeBoost = constellationGlow * (0.28 + 0.16 * unifiedBreathe);
+
+            const haloRadius = (26 + flash * 16 + completeBoost * 18) * twinkle;
+            const haloGrad = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, haloRadius);
+            haloGrad.addColorStop(0, `rgba(248, 250, 252, ${Math.min(1, 0.88 + flash * 0.12).toFixed(3)})`);
+            haloGrad.addColorStop(0.18, `rgba(226, 192, 141, ${Math.min(1, 0.52 + completeBoost * 0.32).toFixed(3)})`);
+            haloGrad.addColorStop(0.55, `rgba(226, 192, 141, ${(0.12 + completeBoost * 0.14).toFixed(3)})`);
+            haloGrad.addColorStop(1, 'rgba(226, 192, 141, 0)');
+
+            ctx.fillStyle = haloGrad;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, haloRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            const spikeLen = 11 + flash * 8 + completeBoost * 7;
+            drawStarCrosshair(pos.x, pos.y, spikeLen, 0.42 + completeBoost * 0.28, '248, 250, 252');
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 3.0 + flash * 1.1 + completeBoost * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (isNext) {
+            drawPulsingBeacon(pos.x, pos.y, now);
+          } else {
+            const gentleTwinkle = 0.78 + 0.22 * Math.sin(now * 0.0014 + star.pulsePhase);
+            const haloGrad = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 9);
+            haloGrad.addColorStop(0, `rgba(248, 250, 252, ${(0.34 * gentleTwinkle).toFixed(3)})`);
+            haloGrad.addColorStop(0.5, `rgba(148, 163, 184, ${(0.12 * gentleTwinkle).toFixed(3)})`);
+            haloGrad.addColorStop(1, 'rgba(148, 163, 184, 0)');
+
+            ctx.fillStyle = haloGrad;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = `rgba(226, 232, 240, ${(0.45 * gentleTwinkle).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 1.65, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        if (plantingMode) canvas.style.cursor = 'crosshair';
+        else if (harpMode) canvas.style.cursor = 'pointer';
+        else if (litCount === 0 || awaitingFork) canvas.style.cursor = hoveringInteractive ? 'pointer' : 'default';
+        else if (!showingFinalCard) canvas.style.cursor = 'pointer';
+        else canvas.style.cursor = 'default';
+      }
+
+      // ============================================================
+      // Main Animation Loop
+      // ============================================================
+      let lastFrameTime = performance.now();
+      nextShootingStarAt = lastFrameTime + 5500 + Math.random() * 5500;
+
+      function render(now) {
+        const dt = Math.min(50, now - lastFrameTime);
+        lastFrameTime = now;
+
+        pointer.smoothX += (pointer.x - pointer.smoothX) * 0.04;
+        pointer.smoothY += (pointer.y - pointer.smoothY) * 0.04;
+
+        if (litCount === 7 && completedAt > 0) {
+          const glowProgress = Math.min(1, Math.max(0, (now - completedAt - 420) / 1800));
+          constellationGlow = easeOutCubic(glowProgress);
+        }
+
+        drawSkyBackdrop();
+        drawBackgroundStars(now, dt);
+        drawStarlightLantern();
+        drawShootingStars(now);
+        drawSecretAndPlantedStars(now);
+        drawConstellationLines(now);
+        drawDragThread();
+        drawRipples(now);
+        drawParticles(now);
+        drawConstellationStars(now);
+
+        requestAnimationFrame(render);
+      }
+
+      // Initialize Everything
+      resizeCanvas();
+      renderCapsulesSheet();
+      renderPlantedList();
+      loadSky('chapter1', true);
+
+      if (sharedPlantedStars.length > 0) {
+        setTimeout(() => {
+          showToast('Shared Sky Received', `${sharedPlantedStars.length} planted ${sharedPlantedStars.length === 1 ? 'star awaits' : 'stars await'} in the sky.`, 4600);
+        }, 1200);
+      }
+
+      requestAnimationFrame(render);
+    })();
+  </script>
+</body>
+</html>
